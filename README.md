@@ -1,2 +1,5 @@
 # misc-mods-coop
- Miscellaneous mods for sm64coopdx
+ A repo for smaller/miscellaneous mods I've made for sm64coopdx
+
+- Character Select
+    - Bouncy Icons
