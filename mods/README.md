@@ -2,6 +2,8 @@
 
 A bunch of smaller mods I've worked on, either to put concepts into action or API testing.
 
+Any mods with "Raw File" rather than "Download" next to them require you to press `Ctrl + S` when going onto the page to download
+
 ## [CS] Bouncy Icons - [Raw File](https://raw.githubusercontent.com/Squishy6094/misc-mods-coop/main/mods/cs-bouncy-icons.lua)
 An Add-on/Extension for Character Select that was made for API testing, This mod gets every icon available in the Character List and bounces it around the menu!! >w< C-Left/Right to move icons around, /char-select-bouncy-icons to toggle the add-on
 
