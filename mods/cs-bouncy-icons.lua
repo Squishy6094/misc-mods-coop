@@ -1,5 +1,5 @@
--- name: [CS Add-on] Bouncy Icons
--- description: Silly mod for the Character Select Menu >w< \n\n\\#ff7777\\This Mod requires Character Select\nto use as a Library!
+-- name: [CS] \\#dcdcdc\\Bouncy Icons (Add-on)
+-- description: A silly mod for the Character Select Menu, This mod gets every icon available\nin the Character List and bounces it around the menu!! >w<\n\n\C-Left/Right to move icons around\n\\#ffff33\\/char-select-bouncy-icons\\#dcdcdc\\ to toggle\nthe add-on\n\nCreated by:\\#008800\\ Squishy6094\\#dcdcdc\\\n\n\\#ff7777\\This Mod requires Character Select\nto use as a Library!
 
 if not _G.charSelectExists then
     return 0 
@@ -37,6 +37,7 @@ local function hud_render()
     end
 
     djui_hud_set_color(255, 255, 255, 255)
+    if not showIcons then return end
     for i = 1, #iconList do
         if iconList[i].texture then
             local icon = iconList[i]
@@ -80,4 +81,4 @@ local function toggle()
 end
 
 _G.charSelect.hook_render_in_menu(hud_render)
-hook_chat_command("char-select-icons", "Toggles the Bouncy Icons Add-on for Character Select", toggle)
+hook_chat_command("char-select-bouncy-icons", "Toggles the Bouncy Icons Add-on for Character Select", toggle)
