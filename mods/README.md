@@ -13,7 +13,7 @@ Requires [Character Select](https://github.com/Squishy6094/character-select-coop
 
 Preview: https://twitter.com/6094Squishy/status/1784987343839187134
 
-## Friday Night Funkin' Gumballs Titlescreen - Unfinished
+## Friday Night Funkin' Gumballs Titlescreen - [Download](https://github.com/Squishy6094/misc-mods-coop/raw/main/mods/fnf-gumball-titlescreen/download.zip)
 A Simple Titlescreen when hosting/joining a game inspired by Gumball Mod by [@paigeypaper](https://twitter.com/paigeypaper)
 
 Preview: https://twitter.com/6094Squishy/status/1785719620894404991
