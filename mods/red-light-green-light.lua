@@ -99,7 +99,7 @@ failsafe_options()
 
 local timer = nil
 local timerEnd = nil
-local timerWarning = 21
+local timerWarning = 31
 
 -- Network Timer
 local connectedIndex = 0
@@ -169,6 +169,7 @@ local SafeActs = {
     [ACT_FIRST_PERSON] = true,
     [ACT_CROUCHING] = true,
     [ACT_CROUCH_SLIDE] = true,
+    [ACT_CRAWLING] = true,
 
     -- Never safe
     [ACT_HOLDING_BOWSER] = false,
@@ -201,21 +202,6 @@ local actNoFreeze = {
     [ACT_BURNING_FALL] = true,
     [ACT_BURNING_GROUND] = true,
     [ACT_BURNING_JUMP] = true,
-}
-
-local SafeButtons = {
-    [START_BUTTON] = true,
-    [U_CBUTTONS] = true,
-    [D_CBUTTONS] = true,
-    [L_CBUTTONS] = true,
-    [R_CBUTTONS] = true,
-    [U_JPAD] = true,
-    [D_JPAD] = true,
-    [L_JPAD] = true,
-    [R_JPAD] = true,
-    [R_TRIG] = true,
-    [Z_TRIG] = true,
-    [L_TRIG] = true,
 }
 
 local function nullify_inputs(m, nullCam)
@@ -414,9 +400,10 @@ function before_mario_update(m)
             if gGlobalSyncTable.redlightmode ~= 2 then
                 local x = m.controller.stickX
                 local y = m.controller.stickY
+                speed = math.sqrt(m.vel.x^2 + m.vel.z^2)
 
-                if (m.controller.buttonDown ~= 0 and not SafeButtons[m.controller.buttonDown]) or ((x ~= 0 or y ~= 0) and (m.forwardVel > 0 or SafeActs[m.action] == false)) then
-                    if not SafeActs[m.action] and not is_game_paused() and not SafeButtons[m.controller.buttonDown] and m.health > 255 then
+                if (speed > 5 and not SafeActs[m.action]) or SafeActs[m.action] == false then
+                    if not SafeActs[m.action] and not is_game_paused() and m.health > 255 then
                         if gGlobalSyncTable.redlightmode == 0 then
                             deathTimer = deathTimer + 1
                             if deathTimer >= 10 then
@@ -432,7 +419,7 @@ function before_mario_update(m)
                         end
                     else
                         if m.action == ACT_CRAWLING or m.action == ACT_START_CRAWLING or m.action == ACT_STOP_CRAWLING then
-                            if math.random(0, 200) == 64 then
+                            if math.random(0, 100) == 64 then
                                 m.health = 255
                                 deathTimer = 0
                                 djui_popup_create_global("Red Light/Green Light\n"..gNetworkPlayers[0].name.."\\#dcdcdc\\ was Caught Crawling!", 2)
@@ -612,7 +599,7 @@ function on_hud_render()
             djui_hud_set_color(r*0.5, g*0.5, 0, 255)
         end
         djui_hud_render_rect(screenWidth - 40, 4 + offsetY, 80, 16)
-        djui_hud_set_color(255, 255, 255, 255)
+        djui_hud_set_color(255, r*0.5, r*0.5, 255)
         djui_hud_render_rect(screenWidth - 40, 18 + offsetY, 80*(deathTimer*0.1), 2)
 
         djui_hud_set_color(0, 0, 0, 200)
