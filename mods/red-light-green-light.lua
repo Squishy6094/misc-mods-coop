@@ -100,6 +100,8 @@ failsafe_options()
 local timer = nil
 local timerEnd = nil
 local timerWarning = 31
+local cooldownTimer = 0
+local cooldownTimerStart = 150
 
 -- Network Timer
 local connectedIndex = 0
@@ -290,6 +292,7 @@ local inputStallToButton = 10
 
 local lightGreen = true
 local deathTimer = 0
+local deathTimerMax = 15
 
 local function menu_update(m)
     if menu then
@@ -400,13 +403,13 @@ function before_mario_update(m)
             if gGlobalSyncTable.redlightmode ~= 2 then
                 local x = m.controller.stickX
                 local y = m.controller.stickY
-                speed = math.sqrt(m.vel.x^2 + m.vel.z^2)
+                local speed = math.sqrt(m.vel.x^2 + math.max(m.vel.y, 0)^2 + m.vel.z^2)
 
-                if (speed > 5 and not SafeActs[m.action]) or SafeActs[m.action] == false then
+                if (speed > 10 and not SafeActs[m.action]) or SafeActs[m.action] == false then
                     if not SafeActs[m.action] and not is_game_paused() and m.health > 255 then
                         if gGlobalSyncTable.redlightmode == 0 then
                             deathTimer = deathTimer + 1
-                            if deathTimer >= 10 then
+                            if deathTimer >= deathTimerMax then
                                 m.health = 255
                                 deathTimer = 0
                             end
@@ -449,13 +452,17 @@ function before_mario_update(m)
     end
 
     -- Host Trigger
-    if gGlobalSyncTable.triggermode == 1 then
-        if m.controller.buttonPressed & L_TRIG ~= 0 then
+    if gGlobalSyncTable.triggermode == 1 and network_is_server() then
+        if m.controller.buttonPressed & L_TRIG ~= 0 and cooldownTimer == 0 then
             timer = (timer > timerWarning) and timerWarning - 1 or timerWarning + 1
+            cooldownTimer = (timer > timerWarning) and cooldownTimerStart or 0
             local data = {
                 timerStart = timer,
             }
             network_send(true, data)
+        end
+        if cooldownTimer > 0 then
+            cooldownTimer = cooldownTimer - 1
         end
     end
 end
@@ -486,16 +493,30 @@ end
 -- Hud Stuff
 local menuSlideMax = 0
 local menuSlide = 1
+local r = 0
+local g = 0
+local screenWidth = 0
 local y = -100
 function on_hud_render()
     djui_hud_set_resolution(RESOLUTION_N64)
     djui_hud_set_font(FONT_NORMAL)
 
-    -- check gamemode enabled state
+    if menu then
+        if menuSlide < menuSlideMax then
+            menuSlide = menuSlide*1.2
+        elseif menuSlideMax ~= 0 then
+            menuSlide = menuSlideMax
+        end
+    else
+        if menuSlide > 1 then
+            menuSlide = menuSlide*0.9
+        else
+            menuSlide = 1
+        end
+    end
 
-    local text = ''
-    local r = 0
-    local g = 0
+    local text = ""
+    local subtext = ""
 
     if lightGreen then
         text = "Green Light"
@@ -516,6 +537,7 @@ function on_hud_render()
     if optionTable[optionTableRef.lighttext].toggle == 1 then
         text = optionTable[optionTableRef.redlightmode].toggleNames[gGlobalSyncTable.redlightmode + 1]
     end
+    subtext = optionTable[optionTableRef.redlightmode].toggleNames[gGlobalSyncTable.redlightmode + 1].." | "..optionTable[optionTableRef.triggermode].toggleNames[gGlobalSyncTable.triggermode + 1]..(gGlobalSyncTable.mhLights ~= 0 and " | "..optionTable[optionTableRef.mhLights].toggleNames[gGlobalSyncTable.mhLights + 1] or "")
     if localredlightgreenlight == 0 then
         text = "Unaffected"
     end
@@ -523,7 +545,7 @@ function on_hud_render()
     local scale = 0.50
 
     -- get width of screen and text
-    local screenWidth = djui_hud_get_screen_width()*0.5
+    screenWidth = djui_hud_get_screen_width()*0.5
     local offsetY = 0
     local offsetScaleY = 0
     if gGlobalSyncTable.redlightgreenlight ~= 1 then
@@ -538,23 +560,9 @@ function on_hud_render()
 
     djui_hud_set_color(0, 0, 0, 150)
     if menuSlide > 1 or offsetScaleY ~= -18 then
-        djui_hud_render_rect(screenWidth - 42, 2 + offsetY, 84, 19 + menuSlide + offsetScaleY)
+        djui_hud_render_rect(screenWidth - 42, 2 + offsetY, 84, 25 + menuSlide + offsetScaleY)
     end
     
-    if menu then
-        if menuSlide < menuSlideMax then
-            menuSlide = menuSlide*1.2
-        elseif menuSlideMax ~= 0 then
-            menuSlide = menuSlideMax
-        end
-    else
-        if menuSlide > 1 then
-            menuSlide = menuSlide*0.9
-        else
-            menuSlide = 1
-        end
-    end
-
     if menu or menuSlide > 1 then
         local menuSlideCount = 0
         for i = 1, #optionTable do
@@ -586,7 +594,7 @@ function on_hud_render()
                 menuSlideCount = menuSlideCount + 1
             end
         end
-        menuSlideMax = menuSlideCount*10 + 3
+        menuSlideMax = menuSlideCount*10 + 3 + 5
         y = menuSlide - 10*(menuSlideCount - 1) - 3 + offsetY + offsetScaleY
     end
 
@@ -599,22 +607,34 @@ function on_hud_render()
             djui_hud_set_color(r*0.5, g*0.5, 0, 255)
         end
         djui_hud_render_rect(screenWidth - 40, 4 + offsetY, 80, 16)
-        djui_hud_set_color(255, r*0.5, r*0.5, 255)
-        djui_hud_render_rect(screenWidth - 40, 18 + offsetY, 80*(deathTimer*0.1), 2)
+        if gGlobalSyncTable.redlightmode == 0 then
+            djui_hud_set_color(255, 100, 100, 255)
+            djui_hud_render_rect(screenWidth - 40, 18 + offsetY, 80*(deathTimer*0.1), 2)
+        end
+        if gGlobalSyncTable.triggermode == 1 then
+            djui_hud_set_color(200, 255, 200, 255)
+            djui_hud_render_rect(screenWidth - 40, 18 + offsetY, 80*(cooldownTimer/cooldownTimerStart), 2)
+        end
 
         djui_hud_set_color(0, 0, 0, 200)
         djui_hud_print_text(text, screenWidth - djui_hud_measure_text(text)*scale*0.5, 4 + offsetY, scale)
+        djui_hud_set_font(FONT_TINY)
+        djui_hud_set_color(255, 255, 0, 200)
+        djui_hud_print_text(subtext, screenWidth - djui_hud_measure_text(subtext)*scale*0.5, 19 + offsetY + menuSlide, scale)
+    end
+end
 
-        if optionTable[optionTableRef.vignette].toggle ~= 0 and localredlightgreenlight == 1 then
-            local multiply = optionTable[optionTableRef.vignette].toggle * optionTable[optionTableRef.vignette].toggle
-            for i = 1, 10 do
-                djui_hud_set_color(r, g, 0, 5 * multiply)
-                djui_hud_render_rect(0, 0, 10 * i, 240);
-                djui_hud_render_rect(screenWidth*2 + -10 * i + 2, 0, 10 * i, 240);
-            end
+function on_hud_render_behind()
+    djui_hud_set_resolution(RESOLUTION_N64)
+    if gGlobalSyncTable.redlightgreenlight == 1 and optionTable[optionTableRef.vignette].toggle ~= 0 and localredlightgreenlight == 1 then
+        local multiply = optionTable[optionTableRef.vignette].toggle * optionTable[optionTableRef.vignette].toggle
+        for i = 1, 10 do
             djui_hud_set_color(r, g, 0, 5 * multiply)
-            djui_hud_render_rect(0, 0, screenWidth*2 + 2, 240);
+            djui_hud_render_rect(0, 0, 10 * i, 240);
+            djui_hud_render_rect(screenWidth*2 + -10 * i + 2, 0, 10 * i, 240);
         end
+        djui_hud_set_color(r, g, 0, 5 * multiply)
+        djui_hud_render_rect(0, 0, screenWidth*2 + 2, 240);
     end
 end
 
@@ -628,4 +648,5 @@ hook_event(HOOK_ON_PLAYER_CONNECTED, on_connect)
 hook_event(HOOK_ON_PACKET_RECEIVE, on_packet_receive)
 hook_event(HOOK_BEFORE_MARIO_UPDATE, before_mario_update)
 hook_event(HOOK_ON_HUD_RENDER, on_hud_render)
+hook_event(HOOK_ON_HUD_RENDER_BEHIND, on_hud_render_behind)
 hook_chat_command("rlgl", "Opens the Red Light/Green Light Settings", toggle_menu)
