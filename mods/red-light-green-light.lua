@@ -1,5 +1,5 @@
--- name: Red/Green Light
--- description: \\#ff0000\\Red Light\\#ffff00\\/\\#00ff00\\Green Light!\n\n\\#dddddd\\Self explanatory, The indicator at the top tells you the Light's current state.\nYou will be given an audible and visual warning of 0.7 seconds before the light switches.\nTurn the mod off or on using /rlgl.\n\nGamemode by:\n\\#550000\\GroovyBeardLover \\#dddddd\\& \\#005500\\Squishy 6094
+-- name: \\#ff7777\\Red Light\\#dcdcdc\\/\\#77ff77\\Green Light\\#dcdcdc\\
+-- description: \\#ff7777\\Red Light\\#dcdcdc\\/\\#77ff77\\Green Light\n\\#ffff77\\( Gamemode/Add-on )\n\n\\#dcdcdc\\The classic game played between childhood friends addapted to\nwork in Super Mario 64, featuring a\nmultitute of Host and User options toggleable via \\#ffff33\\/rlgl\\#dcdcdc\\\n\n\Remake by: \\#008800\\Squishy 6094\n\\#dcdcdc\\Original Mod by: \\#880000\\GroovyBeardLover
 local warning = false
 gGlobalSyncTable.timer = math.random(1, 30) * 30
 gGlobalSyncTable.light = true
