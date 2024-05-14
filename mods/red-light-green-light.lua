@@ -97,8 +97,8 @@ end
 
 failsafe_options()
 
-local timer = nil
-local timerEnd = nil
+local timer = -1
+local timerEnd = -2
 local timerWarning = 31
 local cooldownTimer = 0
 local cooldownTimerStart = 150
@@ -377,7 +377,12 @@ function before_mario_update(m)
         gPlayerSyncTable[0].isUpdating = true
     end
 
-    lightGreen = (timer > 0)
+    -- Prevent script errors while waiting for packet
+    if timer ~= nil then
+        lightGreen = (timer > 0)
+    else
+        timer = 0
+    end
     menu_update(m)
 
     if not warning and lightGreen and timer < timerWarning then
@@ -401,11 +406,10 @@ function before_mario_update(m)
     if gGlobalSyncTable.redlightgreenlight == 1 then
         if not lightGreen then
             if gGlobalSyncTable.redlightmode ~= 2 then
-                local x = m.controller.stickX
-                local y = m.controller.stickY
+                local stick = math.sqrt(m.controller.stickX^2 + m.controller.stickY^2)
                 local speed = math.sqrt(m.vel.x^2 + math.max(m.vel.y, 0)^2 + m.vel.z^2)
 
-                if (speed > 10 and not SafeActs[m.action]) or SafeActs[m.action] == false then
+                if (speed > 10 or speed > 0 and stick > 20 and not SafeActs[m.action]) or SafeActs[m.action] == false or deathTimer >= deathTimerMax then
                     if not SafeActs[m.action] and not is_game_paused() and m.health > 255 then
                         if gGlobalSyncTable.redlightmode == 0 then
                             deathTimer = deathTimer + 1
@@ -413,18 +417,25 @@ function before_mario_update(m)
                                 m.health = 255
                                 deathTimer = 0
                             end
+                        else
+                            deathTimer = 0
                         end
                         if gGlobalSyncTable.redlightmode == 1 then
                             m.health = m.health - 20
                         end
                         if m.health <= 255 then
-                            djui_popup_create_global("Red Light/Green Light\n"..gNetworkPlayers[0].name.."\\#dcdcdc\\ was Caught Moving!", 2)
+                            local color = {r = 0, g = 0, b = 0}
+                            djui_chat_message_create(color.r..color.g..color.b)
+                            djui_popup_create_global("Red Light/Green Light\n\\#"..color.r..color.g..color.b.."\\"..gNetworkPlayers[0].name.."\\#dcdcdc\\ was Caught Moving!", 2)
+                            set_mario_action(m, ACT_HARD_BACKWARD_GROUND_KB, 0)
+                            m.forwardVel = -5
                         end
                     else
                         if m.action == ACT_CRAWLING or m.action == ACT_START_CRAWLING or m.action == ACT_STOP_CRAWLING then
                             if math.random(0, 100) == 64 then
                                 m.health = 255
                                 deathTimer = 0
+
                                 djui_popup_create_global("Red Light/Green Light\n"..gNetworkPlayers[0].name.."\\#dcdcdc\\ was Caught Crawling!", 2)
                             end
                         end
@@ -609,7 +620,7 @@ function on_hud_render()
         djui_hud_render_rect(screenWidth - 40, 4 + offsetY, 80, 16)
         if gGlobalSyncTable.redlightmode == 0 then
             djui_hud_set_color(255, 100, 100, 255)
-            djui_hud_render_rect(screenWidth - 40, 18 + offsetY, 80*(deathTimer*0.1), 2)
+            djui_hud_render_rect(screenWidth - 40, 18 + offsetY, 80*(math.min(deathTimer, deathTimerMax)/deathTimerMax), 2)
         end
         if gGlobalSyncTable.triggermode == 1 then
             djui_hud_set_color(200, 255, 200, 255)
