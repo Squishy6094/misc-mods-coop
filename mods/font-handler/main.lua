@@ -1,5 +1,5 @@
 -- name: Custom Font Handler
--- description: Utility that allows modders to easily implement Custom Fonts via Lua. Just drag \\#7777ff\\a-font-handler.lua\\#dcdcdc\\ into your mod's folder!\n\nCreated by: \\#008800\\Squishy 6094
+-- description: Utility that allows modders to easily implement Custom Fonts via Lua. Just drag \\#7777ff\\!font-handler.lua\\#dcdcdc\\ into your mod's folder!\n\nCreated by: \\#008800\\Squishy 6094
 
 --[[
     This example showcases how the default functions
