@@ -1,4 +1,5 @@
 -- name: Custom Font Handler
+-- description: Utility that allows modders to easily implement Custom Fonts via Lua. Just drag \\#7777ff\\a-font-handler.lua\\#dcdcdc\\ into your mod's folder!\n\nCreated by: \\#008800\\Squishy 6094
 
 --[[
     This example showcases how the default functions
@@ -6,7 +7,8 @@
     to manually mess with textures tiling
 ]]
 
-local fontInfoDs = {
+
+local fontInfoDs = { -- Maps textures in a spritesheet to letters
     ["A"] = {x = 0, y = 0, width = 5, height = 9},
     ["B"] = {x = 6, y = 0, width = 5, height = 9},
     ["C"] = {x = 12, y = 0, width = 5, height = 9},
@@ -82,17 +84,39 @@ local fontInfoDs = {
     ["?"] = {x = 89, y = 22, width = 4, height = 9},
     ["'"] = {x = 94, y = 22, width = 1, height = 9},
     ['"'] = {x = 94, y = 22, width = 3, height = 9},
+    ["("] = {x = 98, y = 22, width = 3, height = 9},
+    [")"] = {x = 102, y = 22, width = 3, height = 9},
+    ["["] = {x = 106, y = 22, width = 3, height = 9},
+    ["]"] = {x = 110, y = 22, width = 3, height = 9},
+    ["{"] = {x = 114, y = 22, width = 4, height = 9},
+    ["}"] = {x = 119, y = 22, width = 4, height = 9},
+    ["@"] = {x = 0, y = 32, width = 7, height = 9},
+    ["#"] = {x = 8, y = 32, width = 7, height = 9},
+    ["$"] = {x = 16, y = 32, width = 7, height = 9},
+    ["%"] = {x = 22, y = 32, width = 7, height = 9},
+    ["^"] = {x = 30, y = 32, width = 3, height = 9},
+    ["&"] = {x = 34, y = 32, width = 6, height = 9},
+    ["*"] = {x = 41, y = 32, width = 7, height = 9},
+    ["~"] = {x = 49, y = 32, width = 5, height = 9},
+    [":"] = {x = 55, y = 32, width = 1, height = 9},
+    [";"] = {x = 57, y = 32, width = 2, height = 9},
 }
 
-FONT_DSBIOS = djui_hud_add_font(get_texture_info("font-ds"), fontInfoDs, 1, "x", 2)
+-- Font can use a unique variable, or an existing font to overwrite it
+FONT_DSBIOS = djui_hud_add_font(get_texture_info("font-ds"), fontInfoDs, 1, 3, "x", 2)
+
+local TEXT_SM64 = "Super Mario 64"
+local TEXT_DSBIOS = "Nintendo DS Bios"
 
 local function hud_render()
     djui_hud_set_resolution(RESOLUTION_N64)
-    djui_hud_set_color(0, 255, 0, 255)
+    djui_hud_set_color(0, 0, 0, 255)
+    local widthHalf = djui_hud_get_screen_width()*0.5
+
     djui_hud_set_font(FONT_NORMAL)
-    djui_hud_print_text("Yo watch this dash", 20, 40, 1)
+    djui_hud_print_text(TEXT_SM64, widthHalf - djui_hud_measure_text(TEXT_SM64)*0.5, 20, 1)
     djui_hud_set_font(FONT_DSBIOS)
-    djui_hud_print_text("LOOK!!! -", 20, 100, 2)
+    djui_hud_print_text(TEXT_DSBIOS, widthHalf - djui_hud_measure_text(TEXT_DSBIOS)*0.5, 60, 1)
 end
 
 hook_event(HOOK_ON_HUD_RENDER, hud_render)

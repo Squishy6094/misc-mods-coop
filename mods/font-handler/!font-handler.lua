@@ -21,10 +21,11 @@ local customFontType = FONT_NORMAL
 ---@param texture TextureInfo
 ---@param info table
 ---@param spacing integer
+---@param offset integer
 ---@param backup string
 ---@param scale integer
 ---@return DjuiFontType
-function djui_hud_add_font(texture, info, spacing, backup, scale)
+function djui_hud_add_font(texture, info, spacing, offset, backup, scale)
     if texture == nil then return FONT_NORMAL end
     if info == nil then return FONT_NORMAL end
     if spacing == nil then spacing = 1 end
