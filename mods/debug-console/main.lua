@@ -406,13 +406,15 @@ local windowHeight = 300*scale
 
 local mouseWindowOffsetX = 0
 local mouseWindowOffsetY = 0
-local windowHeld = false
+local prevWindowX = windowX
+local prevWindowWidth = windowWidth
+local windowHeld = 0
 
 local MATH_DIVIDE_SCALE = 1/scale
 local MATH_DIVIDE_FONT_WIDTH = 1/fontInfoConsole["_"].width
 local MATH_DIVIDE_FONT_HEIGHT = 1/fontInfoConsole["_"].height
 
-local function console_add_line(string)
+local function console_add_lines(string)
     local tableLength = #stringTable
     local currLine = 1
     local output = ""
@@ -420,13 +422,13 @@ local function console_add_line(string)
         local letter = string:sub(i,i)
         output = output..letter
         if i%math.floor((windowWidth - 20)*MATH_DIVIDE_SCALE*MATH_DIVIDE_FONT_WIDTH) == 0 then
-            stringTable[tableLength + currLine] = output
+            table.insert(stringTable, output)
             currLine = currLine + 1
             output = ""
         end
     end
     if output ~= "" then
-        stringTable[tableLength + currLine] = output
+        table.insert(stringTable, output)
     end
 end
 
@@ -449,11 +451,11 @@ local function hud_render()
     stringTable[#stringTable + 1] = "Pos: x="..math.floor(m.pos.x)..", y="..math.floor(m.pos.y)..", z="..math.floor(m.pos.z)
     stringTable[#stringTable + 1] = "Forward Vel: "..math.floor(m.forwardVel)
     stringTable[#stringTable + 1] = "Vertical Vel: "..math.floor(m.vel.y)
-    console_add_line("Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"))
-    console_add_line("Prev Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"))
+    console_add_lines("Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"))
+    console_add_lines("Prev Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"))
     stringTable[#stringTable + 1] = ""
     stringTable[#stringTable + 1] = "Area Info"
-    console_add_line("Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")")
+    console_add_lines("Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")")
 
     stringTable[#stringTable + 1] = ""
     stringTable[#stringTable + 1] = "< Next Page | Prev Page >"
@@ -478,6 +480,16 @@ local function hud_render()
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
         djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
+        if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) then
+            djui_hud_set_rotation(0x4000, 0.5, 0.5)
+            djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
+            djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+            djui_hud_set_rotation(0x0, 0.5, 0.5)
+        end
+        if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) then
+            djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
+            djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+        end
     end
 end
 
@@ -501,17 +513,37 @@ local function mouse_handler(m)
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
         djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
-
-        if (mouseX > windowX and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) or windowHeld then
+        if (mouseX > windowX and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
             if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                 windowX = mouseX - mouseWindowOffsetX
                 windowY = mouseY - mouseWindowOffsetY
-                windowHeld = true
+                windowHeld = 1
                 nullify_inputs(m)
             else
                 mouseWindowOffsetX = mouseX - windowX
                 mouseWindowOffsetY = mouseY - windowY
-                windowHeld = false
+                windowHeld = 0
+            end
+        end
+
+        if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) or windowHeld == 3 then
+            if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
+                if mouseY > windowY + windowHeight*0.5 then
+                    windowHeight = math.max(mouseY - windowY, 200*scale)
+                else
+                    --[[
+                    windowX = (windowWidth >= 200*scale and mouseX or windowX)
+                    windowWidth = math.max((windowX - prevWindowX) + prevWindowWidth, 200*scale)
+                    ]]
+                end
+                windowHeld = 3
+                nullify_inputs(m)
+            else
+                mouseWindowOffsetX = mouseX - windowX
+                mouseWindowOffsetY = mouseY - windowY
+                prevWindowX = windowX
+                prevWindowWidth = windowWidth
+                windowHeld = 0
             end
         end
     end
