@@ -398,6 +398,9 @@ local stringTable = {}
 -- Font can use a unique variable, or an existing font to overwrite it
 FONT_CONSOLE = djui_hud_add_font(get_texture_info("font-console"), fontInfoConsole, 1, 3, "_", 1)
 
+local consoleToggle = true
+local consolePage = 1
+
 local scale = 2
 local windowX = 50 
 local windowY = 200
@@ -411,24 +414,34 @@ local prevWindowWidth = windowWidth
 local windowHeld = 0
 
 local MATH_DIVIDE_SCALE = 1/scale
-local MATH_DIVIDE_FONT_WIDTH = 1/fontInfoConsole["_"].width
-local MATH_DIVIDE_FONT_HEIGHT = 1/fontInfoConsole["_"].height
+local MATH_DIVIDE_FONT_WIDTH = 1/(fontInfoConsole["_"].width + 1)
+local MATH_DIVIDE_FONT_HEIGHT = 1/(fontInfoConsole["_"].height + 1)
 
 local function console_add_lines(string)
-    local tableLength = #stringTable
-    local currLine = 1
-    local output = ""
-    for i = 1, #string do
-        local letter = string:sub(i,i)
-        output = output..letter
-        if i%math.floor((windowWidth - 20)*MATH_DIVIDE_SCALE*MATH_DIVIDE_FONT_WIDTH) == 0 then
-            table.insert(stringTable, output)
-            currLine = currLine + 1
-            output = ""
-        end
+    local loopcount = 1
+    if type(string) == "table" then
+        loopcount = #string
     end
-    if output ~= "" then
-        table.insert(stringTable, output)
+
+    for k = 1, loopcount do
+        local currLine = 1
+        local output = ""
+        local string = string
+        if type(string) == "table" then
+            string = string[k]
+        end
+        for i = 1, #string do
+            local letter = string:sub(i,i)
+            output = output..letter
+            if i%math.floor((windowWidth - 20)*MATH_DIVIDE_SCALE*MATH_DIVIDE_FONT_WIDTH) == 0 then
+                table.insert(stringTable, output)
+                currLine = currLine + 1
+                output = ""
+            end
+        end
+        if output ~= "" then
+            table.insert(stringTable, output)
+        end
     end
 end
 
@@ -436,59 +449,73 @@ local function hud_render()
     djui_hud_set_resolution(RESOLUTION_DJUI)
     local m = gMarioStates[0]
     local np = gNetworkPlayers[0]
+    stringTable = {}
+    if consoleToggle then
+        console_add_lines({
+            "-----------------------",
+            "Debug Console "..DEBUG_CONSOLE_VERSION,
+            "Made by Squishy6094",
+            "",
+            "Font Handler v0.5",
+            "-----------------------",
+            "",
+        })
 
-    stringTable = {
-        "------------------------",
-        "Debug Console "..DEBUG_CONSOLE_VERSION,
-        "Made by Squishy6094",
-        "",
-        "Font Handler v0.5",
-        "------------------------",
-        "",
-    }
-
-    stringTable[#stringTable + 1] = "Movement Info"
-    stringTable[#stringTable + 1] = "Pos: x="..math.floor(m.pos.x)..", y="..math.floor(m.pos.y)..", z="..math.floor(m.pos.z)
-    stringTable[#stringTable + 1] = "Forward Vel: "..math.floor(m.forwardVel)
-    stringTable[#stringTable + 1] = "Vertical Vel: "..math.floor(m.vel.y)
-    console_add_lines("Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"))
-    console_add_lines("Prev Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"))
-    stringTable[#stringTable + 1] = ""
-    stringTable[#stringTable + 1] = "Area Info"
-    console_add_lines("Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")")
-
-    stringTable[#stringTable + 1] = ""
-    stringTable[#stringTable + 1] = "< Next Page | Prev Page >"
-    stringTable[#stringTable + 1] = "    D-pad L | D-pad R"
-    
-
-    djui_hud_set_color(0, 0, 0, 255)
-    djui_hud_render_rect(windowX, windowY, windowWidth, windowHeight)
-    djui_hud_set_color(255, 255, 255, 255)
-    djui_hud_render_rect(windowX, windowY, windowWidth, 30)
-    djui_hud_render_texture(gTextures.star, windowX + 6, windowY + 5, 1.3, 1.3)
-    djui_hud_set_font(FONT_TINY)
-    djui_hud_set_color(100, 100, 100, 255)
-    djui_hud_print_text("Debug Console "..DEBUG_CONSOLE_VERSION, windowX + 30, windowY + 4, 1.5)
-    djui_hud_set_font(FONT_CONSOLE)
-    djui_hud_set_color(255, 255, 255, 255)
-    for i = 1, #stringTable do
-        djui_hud_print_text(stringTable[i], windowX + 10, windowY + 30 + (12*i)*scale, scale)
-    end
-
-    if is_game_paused() then
-        local mouseX = djui_hud_get_mouse_x()
-        local mouseY = djui_hud_get_mouse_y()
-        djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
-        if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) then
-            djui_hud_set_rotation(0x4000, 0.5, 0.5)
-            djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
-            djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
-            djui_hud_set_rotation(0x0, 0.5, 0.5)
+        if consolePage == 1 then
+            console_add_lines({
+                "Movement Info:",
+                "Pos: x="..math.floor(m.pos.x)..", y="..math.floor(m.pos.y)..", z="..math.floor(m.pos.z),
+                "Forward Vel: "..math.floor(m.forwardVel),
+                "Vertical Vel: "..math.floor(m.vel.y),
+                "Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"),
+                "Prev Action: "..(sActionTable[m.prevAction] ~= nil and sActionTable[m.action] or "???"),
+            })
         end
-        if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) then
-            djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
-            djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+
+        if consolePage == 2 then
+            console_add_lines({
+                "Area Info",
+                "Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")"
+            })
+        end
+
+        
+        console_add_lines({
+            "",
+            "< Next Page | Prev Page >",
+            "    D-pad L | D-pad R"
+        })
+
+        djui_hud_set_color(0, 0, 0, 255)
+        djui_hud_render_rect(windowX, windowY, windowWidth, windowHeight)
+        djui_hud_set_color(255, 255, 255, 255)
+        djui_hud_render_rect(windowX, windowY, windowWidth, 30)
+        djui_hud_render_texture(gTextures.star, windowX + 6, windowY + 5, 1.3, 1.3)
+        djui_hud_set_font(FONT_TINY)
+        djui_hud_set_color(100, 100, 100, 255)
+        djui_hud_print_text("Debug Console "..DEBUG_CONSOLE_VERSION, windowX + 30, windowY + 4, 1.5)
+        djui_hud_set_color(255, 0, 0, 255)
+        djui_hud_render_rect(windowX + windowWidth - 50, windowY, 50, 30)
+        djui_hud_set_font(FONT_CONSOLE)
+        djui_hud_set_color(255, 255, 255, 255)
+        for i = 1, math.min(#stringTable, (windowHeight - 60)*MATH_DIVIDE_FONT_HEIGHT*MATH_DIVIDE_SCALE) do
+            djui_hud_print_text(stringTable[i], windowX + 10, windowY + 30 + (12*i)*scale, scale)
+        end
+
+        if is_game_paused() then
+            local mouseX = djui_hud_get_mouse_x()
+            local mouseY = djui_hud_get_mouse_y()
+            djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
+            if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) then
+                djui_hud_set_rotation(0x4000, 0.5, 0.5)
+                djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
+                djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+                djui_hud_set_rotation(0x0, 0.5, 0.5)
+            end
+            if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) then
+                djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
+                djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+            end
         end
     end
 end
@@ -513,7 +540,7 @@ local function mouse_handler(m)
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
         djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
-        if (mouseX > windowX and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
+        if (mouseX > windowX and mouseX < windowX + windowWidth - 50 and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
             if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                 windowX = mouseX - mouseWindowOffsetX
                 windowY = mouseY - mouseWindowOffsetY
@@ -522,6 +549,36 @@ local function mouse_handler(m)
             else
                 mouseWindowOffsetX = mouseX - windowX
                 mouseWindowOffsetY = mouseY - windowY
+                windowHeld = 0
+            end
+        end
+
+        
+        if (mouseX > windowX + windowWidth - 50 and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
+            if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
+                consoleToggle = false
+                nullify_inputs(m)
+            end
+        end
+
+        if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) or windowHeld == 2 then
+            if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
+                if mouseX > windowX + windowWidth*0.5 then
+                    windowWidth = math.max(mouseX - windowX, 200*scale)
+                else
+                    --[[
+                    windowX = (windowWidth >= 200*scale and mouseX or windowX)
+                    windowWidth = math.max((windowX - prevWindowX) + prevWindowWidth, 200*scale)
+                    ]]
+                end
+                windowHeld = 2
+                nullify_inputs(m)
+            else
+                --[[
+                mouseWindowOffsetX = mouseX - windowX
+                mouseWindowOffsetY = mouseY - windowY
+                prevWindowX = windowX
+                prevWindowWidth = windowWidth]]
                 windowHeld = 0
             end
         end
@@ -549,5 +606,11 @@ local function mouse_handler(m)
     end
 end
 
+local function console_command()
+    consoleToggle = not consoleToggle
+    return true
+end
+
 hook_event(HOOK_ON_HUD_RENDER, hud_render)
 hook_event(HOOK_BEFORE_MARIO_UPDATE, mouse_handler)
+hook_chat_command("debug-console", "Opens the Debugging Console", console_command)
