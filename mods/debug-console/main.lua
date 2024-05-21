@@ -7,7 +7,7 @@
     to manually mess with textures tiling
 ]]
 
-local DEBUG_CONSOLE_VERSION = "v1 (Beta)"
+local DEBUG_CONSOLE_VERSION = "v1 (In-Dev)"
 
 local backslash = [[\]]
 
@@ -401,10 +401,12 @@ FONT_CONSOLE = djui_hud_add_font(get_texture_info("font-console"), fontInfoConso
 local consoleToggle = true
 
 local consolePageList = {
-    player = 1,
-    area = 2
+    welcome = 1,
+    player = 2,
+    area = 3,
+    brownie = 4,
 }
-local consolePageListMax = 2
+local consolePageListMax = 4
 
 local consoleWindows = {}
 local defaultScale = 1
@@ -413,15 +415,15 @@ local windowLastHeld = 1
 
 local function console_create()
     table.insert(consoleWindows, {
-        consolePage = 1,
+        consolePage = (#consoleWindows == 0 and 1 or 2),
 
         scale = defaultScale,
-        windowX = 50,
-        windowY = 200,
+        windowX = (consoleWindows[#consoleWindows] ~= nil and consoleWindows[#consoleWindows].windowX + 40 or 50),
+        windowY = (consoleWindows[#consoleWindows] ~= nil and consoleWindows[#consoleWindows].windowY + 40 or 200),
         windowWidth = 300*defaultScale,
         windowHeight = 300*defaultScale,
-        windowWidthMin = 195,
-        windowHeightMin = 250,
+        windowWidthMin = 202,
+        windowHeightMin = 150,
         
         exitAnimTimer = 0,
 
@@ -439,9 +441,10 @@ local function console_delete(consoleNum)
     table.remove(consoleWindows, consoleNum)
 end
 
-
-local MATH_DIVIDE_FONT_WIDTH = 1/(fontInfoConsole["_"].width + 1)
-local MATH_DIVIDE_FONT_HEIGHT = 1/(fontInfoConsole["_"].height + 1)
+local fontWidth = fontInfoConsole["_"].width
+local fontHeight = fontInfoConsole["_"].height
+local MATH_DIVIDE_FONT_WIDTH = 1/(fontWidth + 1)
+local MATH_DIVIDE_FONT_HEIGHT = 1/(fontHeight + 1)
 
 local function console_add_lines(console, string)
     local loopcount = 1
@@ -458,7 +461,7 @@ local function console_add_lines(console, string)
         for i = 1, #string do
             local letter = string:sub(i,i)
             output = output..letter
-            if i%math.floor((console.windowWidth - 20)/console.scale*MATH_DIVIDE_FONT_WIDTH) == 0 then
+            if i%math.floor((console.windowWidth - 10 - fontWidth)/console.scale*MATH_DIVIDE_FONT_WIDTH) == 0 then
                 table.insert(stringTable, output)
                 output = ""
             end
@@ -481,15 +484,24 @@ local function hud_render()
         for i = 1, #consoleWindows do
             local console = consoleWindows[i]
             stringTable = {}
+            if i == 1 then
             console_add_lines(console, {
-                "-----------------------",
-                "Debug Console "..DEBUG_CONSOLE_VERSION,
-                "Made by Squishy6094",
-                "",
-                "Font Handler v0.5",
-                "-----------------------",
-                " ",
-            })
+                    "-----------------------",
+                    "Debug Console "..DEBUG_CONSOLE_VERSION,
+                    "Made by Squishy6094",
+                    "",
+                    "Font Handler v0.5",
+                    "-----------------------",
+                    " ",
+                })
+            end
+
+            if console.consolePage == consolePageList.welcome then
+                console_add_lines(console, {
+                    "Welcome to Debugging Console!",
+                    "This mod has Debugging Windows, Which can be moved around while paused like any other window can!",
+                })
+            end
 
             if console.consolePage == consolePageList.player then
                 console_add_lines(console, {
@@ -505,7 +517,16 @@ local function hud_render()
             if console.consolePage == consolePageList.area then
                 console_add_lines(console, {
                     "Area Info",
-                    "Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")"
+                    "Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")",
+                    "Act: ("..np.currActNum..")",
+                    "Area Index: ("..np.currAreaIndex..")",
+                })
+            end
+            
+            if console.consolePage == consolePageList.brownie then
+                console_add_lines(console, {
+                    "LOADING.....",
+                    "brownie's coming..",
                 })
             end
 
@@ -538,7 +559,7 @@ local function hud_render()
             djui_hud_set_rotation(0, 0, 0)
             djui_hud_set_font(FONT_CONSOLE)
             djui_hud_set_color(255, 255, 255, 255)
-            for i = 1, math.min(#stringTable, (console.windowHeight - 60)*MATH_DIVIDE_FONT_HEIGHT/console.scale) do
+            for i = 1, math.min(#stringTable, (console.windowHeight - 10 - fontHeight*2)*MATH_DIVIDE_FONT_HEIGHT) do
                 djui_hud_print_text(stringTable[i], console.windowX + 10, console.windowY + 30 + (12*(i - 1))*console.scale, console.scale)
             end
         end
@@ -550,13 +571,13 @@ local function hud_render()
             if #consoleWindows < 1 then return end
             for i = 1, #consoleWindows do
                 console = consoleWindows[i]
-                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth and mouseX < console.windowX + console.windowWidth + 20) then
+                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth and mouseX < console.windowX + console.windowWidth + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight) then
                     djui_hud_set_rotation(0x4000, 0.5, 0.5)
                     djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
                     djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
                     djui_hud_set_rotation(0x0, 0.5, 0.5)
                 end
-                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight and mouseY < console.windowY + console.windowHeight + 20) then
+                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight and mouseY < console.windowY + console.windowHeight + 20) and (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth) then
                     djui_hud_render_texture(gTextures.arrow_up, mouseX, mouseY - 15, 2, 2)
                     djui_hud_render_texture(gTextures.arrow_down, mouseX, mouseY + 5, 2, 2)
                 end
@@ -585,7 +606,15 @@ local function mouse_handler(m)
     if is_game_paused() then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
-
+        if consoleWindows[windowLastHeld] == nil then
+            if #consoleWindows > 0 then
+                repeat
+                    windowLastHeld = windowLastHeld - 1
+                until consoleWindows[windowLastHeld] ~= nil
+            else
+                windowLastHeld = 1
+            end
+        end
         if #consoleWindows < 1 then windowLastHeld = 0 return end
         for i = #consoleWindows, 1, -1 do
             if windowHeld == 0 or windowHeld == i then
@@ -673,7 +702,7 @@ local function mouse_handler(m)
         end
     end
 
-    if windowLastHeld ~= 0 then
+    if windowLastHeld ~= 0 and consoleWindows[windowLastHeld] ~= nil then
         if pageScrollCooldown <= 0 then
             local console = consoleWindows[windowLastHeld]
             if m.controller.buttonDown & L_JPAD ~= 0 then
@@ -693,7 +722,11 @@ local function mouse_handler(m)
 end
 
 local function console_command()
-    console_create()
+    if #consoleWindows < 3 then
+        console_create()
+    else
+        djui_chat_message_create("Failed to open Console: Too many console instances open")
+    end
     return true
 end
 
