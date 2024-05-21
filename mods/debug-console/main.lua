@@ -399,29 +399,51 @@ local stringTable = {}
 FONT_CONSOLE = djui_hud_add_font(get_texture_info("font-console"), fontInfoConsole, 1, 3, "_", 1)
 
 local consoleToggle = true
-local consolePage = 1
 
-local scale = 2
-local windowX = 50 
-local windowY = 200
-local windowWidth = 300*scale
-local windowHeight = 300*scale
-local windowWidthMin = 195
-local windowHeightMin = 250
+local consolePageList = {
+    player = 1,
+    area = 2
+}
+local consolePageListMax = 2
 
-local exitAnimTimer = 0
-
-local mouseWindowOffsetX = 0
-local mouseWindowOffsetY = 0
-local prevWindowX = windowX
-local prevWindowWidth = windowWidth
+local consoleWindows = {}
+local defaultScale = 1
 local windowHeld = 0
+local windowLastHeld = 1
 
-local MATH_DIVIDE_SCALE = 1/scale
+local function console_create()
+    table.insert(consoleWindows, {
+        consolePage = 1,
+
+        scale = defaultScale,
+        windowX = 50,
+        windowY = 200,
+        windowWidth = 300*defaultScale,
+        windowHeight = 300*defaultScale,
+        windowWidthMin = 195,
+        windowHeightMin = 250,
+        
+        exitAnimTimer = 0,
+
+        mouseWindowOffsetX = 0,
+        mouseWindowOffsetY = 0,
+        prevWindowX = 50,
+        prevWindowWidth = 200,
+        windowHoldPoint = 0,
+    })
+end
+
+console_create()
+
+local function console_delete(consoleNum)
+    table.remove(consoleWindows, consoleNum)
+end
+
+
 local MATH_DIVIDE_FONT_WIDTH = 1/(fontInfoConsole["_"].width + 1)
 local MATH_DIVIDE_FONT_HEIGHT = 1/(fontInfoConsole["_"].height + 1)
 
-local function console_add_lines(string)
+local function console_add_lines(console, string)
     local loopcount = 1
     if type(string) == "table" then
         loopcount = #string
@@ -436,7 +458,7 @@ local function console_add_lines(string)
         for i = 1, #string do
             local letter = string:sub(i,i)
             output = output..letter
-            if i%math.floor((windowWidth - 20)*MATH_DIVIDE_SCALE*MATH_DIVIDE_FONT_WIDTH) == 0 then
+            if i%math.floor((console.windowWidth - 20)/console.scale*MATH_DIVIDE_FONT_WIDTH) == 0 then
                 table.insert(stringTable, output)
                 output = ""
             end
@@ -451,78 +473,93 @@ local function hud_render()
     djui_hud_set_resolution(RESOLUTION_DJUI)
     local m = gMarioStates[0]
     local np = gNetworkPlayers[0]
-    stringTable = {}
     if consoleToggle then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
 
-        console_add_lines({
-            "-----------------------",
-            "Debug Console "..DEBUG_CONSOLE_VERSION,
-            "Made by Squishy6094",
-            "",
-            "Font Handler v0.5",
-            "-----------------------",
-            " ",
-        })
-
-        if consolePage == 1 then
-            console_add_lines({
-                "Movement Info:",
-                "Pos: x="..math.floor(m.pos.x)..", y="..math.floor(m.pos.y)..", z="..math.floor(m.pos.z),
-                "Forward Vel: "..math.floor(m.forwardVel),
-                "Vertical Vel: "..math.floor(m.vel.y),
-                "Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"),
-                "Prev Action: "..(sActionTable[m.prevAction] ~= nil and sActionTable[m.action] or "???"),
+        if #consoleWindows < 1 then return end
+        for i = 1, #consoleWindows do
+            local console = consoleWindows[i]
+            stringTable = {}
+            console_add_lines(console, {
+                "-----------------------",
+                "Debug Console "..DEBUG_CONSOLE_VERSION,
+                "Made by Squishy6094",
+                "",
+                "Font Handler v0.5",
+                "-----------------------",
+                " ",
             })
-        end
 
-        if consolePage == 2 then
-            console_add_lines({
-                "Area Info",
-                "Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")"
-            })
+            if console.consolePage == consolePageList.player then
+                console_add_lines(console, {
+                    "Movement Info:",
+                    "Pos: x="..math.floor(m.pos.x)..", y="..math.floor(m.pos.y)..", z="..math.floor(m.pos.z),
+                    "Forward Vel: "..math.floor(m.forwardVel),
+                    "Vertical Vel: "..math.floor(m.vel.y),
+                    "Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"),
+                    "Prev Action: "..(sActionTable[m.prevAction] ~= nil and sActionTable[m.prevAction] or "???"),
+                })
+            end
+
+            if console.consolePage == consolePageList.area then
+                console_add_lines(console, {
+                    "Area Info",
+                    "Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")"
+                })
+            end
+
+            if is_game_paused() then
+                console_add_lines(console, {
+                    " ",
+                    "< Next | Prev >",
+                    "Use mouse to adjust Window"
+                })
+            end
+
+            djui_hud_set_color(0, 0, 0, 255)
+            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth, console.windowHeight)
+            djui_hud_set_color(255, 255, 255, 255)
+            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth, 30)
+            djui_hud_render_texture(gTextures.star, console.windowX + 6, console.windowY + 5, 1.3, 1.3)
+            djui_hud_set_font(FONT_TINY)
+            if windowLastHeld == i then
+                djui_hud_set_color(100, 100, 100, 255)
+            else
+                djui_hud_set_color(200, 200, 200, 255)
+            end
+            djui_hud_print_text("Debug Console "..DEBUG_CONSOLE_VERSION, console.windowX + 30, console.windowY + 4, 1.5)
+            djui_hud_set_color(255, 0, 0, console.exitAnimTimer)
+            djui_hud_render_rect(console.windowX + console.windowWidth - 50, console.windowY, 50, 30)
+            djui_hud_set_color(console.exitAnimTimer, console.exitAnimTimer, console.exitAnimTimer, 255)
+            djui_hud_set_rotation(0x2000, 0.5, 0.5)
+            djui_hud_render_rect(console.windowX + console.windowWidth - 31, console.windowY + 14, 15, 1)
+            djui_hud_render_rect(console.windowX + console.windowWidth - 23, console.windowY + 7, 1, 15)
+            djui_hud_set_rotation(0, 0, 0)
+            djui_hud_set_font(FONT_CONSOLE)
+            djui_hud_set_color(255, 255, 255, 255)
+            for i = 1, math.min(#stringTable, (console.windowHeight - 60)*MATH_DIVIDE_FONT_HEIGHT/console.scale) do
+                djui_hud_print_text(stringTable[i], console.windowX + 10, console.windowY + 30 + (12*(i - 1))*console.scale, console.scale)
+            end
         end
 
         
-        console_add_lines({
-            " ",
-            "< Next | Prev >",
-            "D-pad L|D-pad R"
-        })
-
-        djui_hud_set_color(0, 0, 0, 255)
-        djui_hud_render_rect(windowX, windowY, windowWidth, windowHeight)
-        djui_hud_set_color(255, 255, 255, 255)
-        djui_hud_render_rect(windowX, windowY, windowWidth, 30)
-        djui_hud_render_texture(gTextures.star, windowX + 6, windowY + 5, 1.3, 1.3)
-        djui_hud_set_font(FONT_TINY)
-        djui_hud_set_color(100, 100, 100, 255)
-        djui_hud_print_text("Debug Console "..DEBUG_CONSOLE_VERSION, windowX + 30, windowY + 4, 1.5)
-        djui_hud_set_color(255, 0, 0, exitAnimTimer)
-        djui_hud_render_rect(windowX + windowWidth - 50, windowY, 50, 30)
-        djui_hud_set_color(exitAnimTimer, exitAnimTimer, exitAnimTimer, 255)
-        djui_hud_set_rotation(0x2000, 0.5, 0.5)
-        djui_hud_render_rect(windowX + windowWidth - 31, windowY + 14, 15, 1)
-        djui_hud_render_rect(windowX + windowWidth - 23, windowY + 7, 1, 15)
-        djui_hud_set_rotation(0, 0, 0)
-        djui_hud_set_font(FONT_CONSOLE)
-        djui_hud_set_color(255, 255, 255, 255)
-        for i = 1, math.min(#stringTable, (windowHeight - 60)*MATH_DIVIDE_FONT_HEIGHT*MATH_DIVIDE_SCALE) do
-            djui_hud_print_text(stringTable[i], windowX + 10, windowY + 30 + (12*(i - 1))*scale, scale)
-        end
-
         if is_game_paused() then
             djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
-            if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) then
-                djui_hud_set_rotation(0x4000, 0.5, 0.5)
-                djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
-                djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
-                djui_hud_set_rotation(0x0, 0.5, 0.5)
-            end
-            if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) then
-                djui_hud_render_texture(gTextures.arrow_up, mouseX, mouseY - 15, 2, 2)
-                djui_hud_render_texture(gTextures.arrow_down, mouseX, mouseY + 5, 2, 2)
+
+            if #consoleWindows < 1 then return end
+            for i = 1, #consoleWindows do
+                console = consoleWindows[i]
+                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth and mouseX < console.windowX + console.windowWidth + 20) then
+                    djui_hud_set_rotation(0x4000, 0.5, 0.5)
+                    djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
+                    djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+                    djui_hud_set_rotation(0x0, 0.5, 0.5)
+                end
+                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight and mouseY < console.windowY + console.windowHeight + 20) then
+                    djui_hud_render_texture(gTextures.arrow_up, mouseX, mouseY - 15, 2, 2)
+                    djui_hud_render_texture(gTextures.arrow_down, mouseX, mouseY + 5, 2, 2)
+                end
             end
         end
     end
@@ -542,86 +579,121 @@ local function nullify_inputs(m)
     c.stickY = 0
 end
 
+local pageScrollCooldown = 0
 local function mouse_handler(m)
     if m.playerIndex ~= 0 then return end
     if is_game_paused() then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
 
-        -- Window Movement
-        if (mouseX > windowX and mouseX < windowX + windowWidth - 50 and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
-            if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
-                windowX = mouseX - mouseWindowOffsetX
-                windowY = mouseY - mouseWindowOffsetY
-                windowHeld = 1
-                nullify_inputs(m)
-            else
-                mouseWindowOffsetX = mouseX - windowX
-                mouseWindowOffsetY = mouseY - windowY
-                windowHeld = 0
+        if #consoleWindows < 1 then windowLastHeld = 0 return end
+        for i = #consoleWindows, 1, -1 do
+            if windowHeld == 0 or windowHeld == i then
+                if windowHeld ~= 0 then windowLastHeld = windowHeld end
+                local console = consoleWindows[i]
+                -- Window Movement
+                if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth - 50 and mouseY > console.windowY and mouseY < console.windowY + 30) or console.windowHoldPoint == 1 then
+                    if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
+                        console.windowX = mouseX - console.mouseWindowOffsetX
+                        console.windowY = mouseY - console.mouseWindowOffsetY
+                        console.windowHoldPoint = 1
+                        windowHeld = i
+                        nullify_inputs(m)
+                    else
+                        console.mouseWindowOffsetX = mouseX - console.windowX
+                        console.mouseWindowOffsetY = mouseY - console.windowY
+                        console.windowHoldPoint = 0
+                        windowHeld = 0
+                    end
+                end
+
+                -- Window Closing
+                if (mouseX > console.windowX + console.windowWidth - 50 and mouseX < console.windowX + console.windowWidth and mouseY > console.windowY and mouseY < console.windowY + 30) then
+                    if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
+                        console_delete(i)
+                        windowHeld = i
+                        nullify_inputs(m)
+                    else
+                        windowHeld = 0
+                    end
+                    console.exitAnimTimer = math.min(console.exitAnimTimer + 40, 255)
+                else
+                    console.exitAnimTimer = math.max(console.exitAnimTimer - 40, 0)
+                end
+
+                -- Window Horizontal Scaling
+                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth and mouseX < console.windowX + console.windowWidth + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight) or console.windowHoldPoint == 2 then
+                    if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
+                        if mouseX > console.windowX + console.windowWidth*0.5 then
+                            console.windowWidth = math.max(mouseX - console.windowX, console.windowWidthMin*console.scale)
+                        else
+                            --[[
+                            console.windowX = (windowWidth >= 200*scale and mouseX or console.windowX)
+                            console.windowWidth = math.max((windowX - prevWindowX) + prevWindowWidth, 200*scale)
+                            ]]
+                        end
+                        console.windowHoldPoint = 2
+                        windowHeld = i
+                        nullify_inputs(m)
+                    else
+                        --[[
+                        console.mouseWindowOffsetX = mouseX - console.windowX
+                        console.mouseWindowOffsetY = mouseY - console.windowY
+                        prevWindowX = console.windowX
+                        prevWindowWidth = console.windowWidth]]
+                        console.windowHoldPoint = 0
+                        windowHeld = 0
+                    end
+                end
+
+                -- Window Vertical Scaling
+                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight and mouseY < console.windowY + console.windowHeight + 20) and (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth) or console.windowHoldPoint == 3 then
+                    if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
+                        if mouseY > console.windowY + console.windowHeight*0.5 then
+                            console.windowHeight = math.max(mouseY - console.windowY, console.windowHeightMin*console.scale)
+                        else
+                            --[[
+                            console.windowX = (windowWidth >= 200*scale and mouseX or console.windowX)
+                            console.windowWidth = math.max((windowX - prevWindowX) + prevWindowWidth, 200*scale)
+                            ]]
+                        end
+                        console.windowHoldPoint = 3
+                        windowHeld = i
+                        nullify_inputs(m)
+                    else
+                        console.mouseWindowOffsetX = mouseX - console.windowX
+                        console.mouseWindowOffsetY = mouseY - console.windowY
+                        console.prevWindowX = console.windowX
+                        console.prevWindowWidth = console.windowWidth
+                        console.windowHoldPoint = 0
+                        windowHeld = 0
+                    end
+                end
             end
         end
+    end
 
-        -- Window Closing
-        if (mouseX > windowX + windowWidth - 50 and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) then
-            if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
-                consoleToggle = false
-                nullify_inputs(m)
+    if windowLastHeld ~= 0 then
+        if pageScrollCooldown <= 0 then
+            local console = consoleWindows[windowLastHeld]
+            if m.controller.buttonDown & L_JPAD ~= 0 then
+                console.consolePage = console.consolePage - 1
+                pageScrollCooldown = 5
             end
-            exitAnimTimer = math.min(exitAnimTimer + 40, 255)
+            if m.controller.buttonDown & R_JPAD ~= 0 then
+                console.consolePage = console.consolePage + 1
+                pageScrollCooldown = 5
+            end
+            if console.consolePage < 1 then console.consolePage = consolePageListMax end
+            if console.consolePage > consolePageListMax then console.consolePage = 1 end
         else
-            exitAnimTimer = math.max(exitAnimTimer - 40, 0)
-        end
-
-        -- Window Horizontal Scaling
-        if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) or windowHeld == 2 then
-            if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
-                if mouseX > windowX + windowWidth*0.5 then
-                    windowWidth = math.max(mouseX - windowX, windowWidthMin*scale)
-                else
-                    --[[
-                    windowX = (windowWidth >= 200*scale and mouseX or windowX)
-                    windowWidth = math.max((windowX - prevWindowX) + prevWindowWidth, 200*scale)
-                    ]]
-                end
-                windowHeld = 2
-                nullify_inputs(m)
-            else
-                --[[
-                mouseWindowOffsetX = mouseX - windowX
-                mouseWindowOffsetY = mouseY - windowY
-                prevWindowX = windowX
-                prevWindowWidth = windowWidth]]
-                windowHeld = 0
-            end
-        end
-
-        -- Window Vertical Scaling
-        if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) or windowHeld == 3 then
-            if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
-                if mouseY > windowY + windowHeight*0.5 then
-                    windowHeight = math.max(mouseY - windowY, windowHeightMin*scale)
-                else
-                    --[[
-                    windowX = (windowWidth >= 200*scale and mouseX or windowX)
-                    windowWidth = math.max((windowX - prevWindowX) + prevWindowWidth, 200*scale)
-                    ]]
-                end
-                windowHeld = 3
-                nullify_inputs(m)
-            else
-                mouseWindowOffsetX = mouseX - windowX
-                mouseWindowOffsetY = mouseY - windowY
-                prevWindowX = windowX
-                prevWindowWidth = windowWidth
-                windowHeld = 0
-            end
+            pageScrollCooldown = pageScrollCooldown - 1
         end
     end
 end
 
 local function console_command()
-    consoleToggle = not consoleToggle
+    console_create()
     return true
 end
 
