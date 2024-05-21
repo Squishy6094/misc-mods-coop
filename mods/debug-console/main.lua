@@ -406,6 +406,10 @@ local windowX = 50
 local windowY = 200
 local windowWidth = 300*scale
 local windowHeight = 300*scale
+local windowWidthMin = 195
+local windowHeightMin = 250
+
+local exitAnimTimer = 0
 
 local mouseWindowOffsetX = 0
 local mouseWindowOffsetY = 0
@@ -424,7 +428,6 @@ local function console_add_lines(string)
     end
 
     for k = 1, loopcount do
-        local currLine = 1
         local output = ""
         local string = string
         if type(string) == "table" then
@@ -435,7 +438,6 @@ local function console_add_lines(string)
             output = output..letter
             if i%math.floor((windowWidth - 20)*MATH_DIVIDE_SCALE*MATH_DIVIDE_FONT_WIDTH) == 0 then
                 table.insert(stringTable, output)
-                currLine = currLine + 1
                 output = ""
             end
         end
@@ -451,6 +453,9 @@ local function hud_render()
     local np = gNetworkPlayers[0]
     stringTable = {}
     if consoleToggle then
+        local mouseX = djui_hud_get_mouse_x()
+        local mouseY = djui_hud_get_mouse_y()
+
         console_add_lines({
             "-----------------------",
             "Debug Console "..DEBUG_CONSOLE_VERSION,
@@ -458,7 +463,7 @@ local function hud_render()
             "",
             "Font Handler v0.5",
             "-----------------------",
-            "",
+            " ",
         })
 
         if consolePage == 1 then
@@ -481,9 +486,9 @@ local function hud_render()
 
         
         console_add_lines({
-            "",
-            "< Next Page | Prev Page >",
-            "    D-pad L | D-pad R"
+            " ",
+            "< Next | Prev >",
+            "D-pad L|D-pad R"
         })
 
         djui_hud_set_color(0, 0, 0, 255)
@@ -494,17 +499,20 @@ local function hud_render()
         djui_hud_set_font(FONT_TINY)
         djui_hud_set_color(100, 100, 100, 255)
         djui_hud_print_text("Debug Console "..DEBUG_CONSOLE_VERSION, windowX + 30, windowY + 4, 1.5)
-        djui_hud_set_color(255, 0, 0, 255)
+        djui_hud_set_color(255, 0, 0, exitAnimTimer)
         djui_hud_render_rect(windowX + windowWidth - 50, windowY, 50, 30)
+        djui_hud_set_color(exitAnimTimer, exitAnimTimer, exitAnimTimer, 255)
+        djui_hud_set_rotation(0x2000, 0.5, 0.5)
+        djui_hud_render_rect(windowX + windowWidth - 31, windowY + 14, 15, 1)
+        djui_hud_render_rect(windowX + windowWidth - 23, windowY + 7, 1, 15)
+        djui_hud_set_rotation(0, 0, 0)
         djui_hud_set_font(FONT_CONSOLE)
         djui_hud_set_color(255, 255, 255, 255)
         for i = 1, math.min(#stringTable, (windowHeight - 60)*MATH_DIVIDE_FONT_HEIGHT*MATH_DIVIDE_SCALE) do
-            djui_hud_print_text(stringTable[i], windowX + 10, windowY + 30 + (12*i)*scale, scale)
+            djui_hud_print_text(stringTable[i], windowX + 10, windowY + 30 + (12*(i - 1))*scale, scale)
         end
 
         if is_game_paused() then
-            local mouseX = djui_hud_get_mouse_x()
-            local mouseY = djui_hud_get_mouse_y()
             djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
             if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) then
                 djui_hud_set_rotation(0x4000, 0.5, 0.5)
@@ -513,8 +521,8 @@ local function hud_render()
                 djui_hud_set_rotation(0x0, 0.5, 0.5)
             end
             if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) then
-                djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
-                djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
+                djui_hud_render_texture(gTextures.arrow_up, mouseX, mouseY - 15, 2, 2)
+                djui_hud_render_texture(gTextures.arrow_down, mouseX, mouseY + 5, 2, 2)
             end
         end
     end
@@ -539,7 +547,8 @@ local function mouse_handler(m)
     if is_game_paused() then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
-        djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
+
+        -- Window Movement
         if (mouseX > windowX and mouseX < windowX + windowWidth - 50 and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
             if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                 windowX = mouseX - mouseWindowOffsetX
@@ -553,18 +562,22 @@ local function mouse_handler(m)
             end
         end
 
-        
-        if (mouseX > windowX + windowWidth - 50 and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) or windowHeld == 1 then
+        -- Window Closing
+        if (mouseX > windowX + windowWidth - 50 and mouseX < windowX + windowWidth and mouseY > windowY and mouseY < windowY + 30) then
             if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
                 consoleToggle = false
                 nullify_inputs(m)
             end
+            exitAnimTimer = math.min(exitAnimTimer + 40, 255)
+        else
+            exitAnimTimer = math.max(exitAnimTimer - 40, 0)
         end
 
+        -- Window Horizontal Scaling
         if (mouseX > windowX - 20 and mouseX < windowX or mouseX > windowX + windowWidth and mouseX < windowX + windowWidth + 20) or windowHeld == 2 then
             if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                 if mouseX > windowX + windowWidth*0.5 then
-                    windowWidth = math.max(mouseX - windowX, 200*scale)
+                    windowWidth = math.max(mouseX - windowX, windowWidthMin*scale)
                 else
                     --[[
                     windowX = (windowWidth >= 200*scale and mouseX or windowX)
@@ -583,10 +596,11 @@ local function mouse_handler(m)
             end
         end
 
+        -- Window Vertical Scaling
         if (mouseY > windowY - 20 and mouseY < windowY or mouseY > windowY + windowHeight and mouseY < windowY + windowHeight + 20) or windowHeld == 3 then
             if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                 if mouseY > windowY + windowHeight*0.5 then
-                    windowHeight = math.max(mouseY - windowY, 200*scale)
+                    windowHeight = math.max(mouseY - windowY, windowHeightMin*scale)
                 else
                     --[[
                     windowX = (windowWidth >= 200*scale and mouseX or windowX)
