@@ -1,5 +1,5 @@
 -- name: Debug Console
--- description: Utility that allows modders to easily implement Custom Fonts via Lua. Just drag \\#7777ff\\!font-handler.lua\\#dcdcdc\\ into your mod's folder!\n\nCreated by: \\#008800\\Squishy 6094
+-- description: Debugging Console themed around Window's \\#888888\\cmd.exe\\#dcdcdc\\!
 
 --[[
     This example showcases how the default functions
@@ -113,7 +113,7 @@ local fontInfoConsole = { -- Maps textures in a spritesheet to letters
     ["~"] = {x = 40, y = 168, width = 7, height = 11},
 }
 
-local sActionTable = {
+local infoActionTable = {
     [ACT_UNINITIALIZED] = "ACT_UNINITIALIZED",
     [ACT_IDLE] = "ACT_IDLE",
     [ACT_START_SLEEPING] = "ACT_START_SLEEPING",
@@ -350,7 +350,7 @@ local sActionTable = {
     [ACT_RELEASING_BOWSER] = "ACT_RELEASING_BOWSER",
 }
 
-local sLevelTable = {
+local infoLevelTable = {
     [LEVEL_NONE] = "LEVEL_NONE",
     [LEVEL_UNKNOWN_1] = "LEVEL_UNKNOWN_1",
     [LEVEL_UNKNOWN_2] = "LEVEL_UNKNOWN_2",
@@ -390,7 +390,6 @@ local sLevelTable = {
     [LEVEL_TTM] = "LEVEL_TTM",
     [LEVEL_UNKNOWN_37] = "LEVEL_UNKNOWN_37",
     [LEVEL_UNKNOWN_38] = "LEVEL_UNKNOWN_38",
-
 }
 
 local stringTable = {}
@@ -399,17 +398,8 @@ local stringTable = {}
 FONT_CONSOLE = djui_hud_add_font(get_texture_info("font-console"), fontInfoConsole, 1, 3, "_", 1)
 
 local consoleToggle = true
-
-local consolePageList = {
-    welcome = 1,
-    player = 2,
-    area = 3,
-    brownie = 4,
-}
-local consolePageListMax = 4
-
 local consoleWindows = {}
-local defaultScale = 1
+local defaultScale = 1.5
 local windowHeld = 0
 local windowLastHeld = 1
 
@@ -418,8 +408,8 @@ local function console_create()
         consolePage = (#consoleWindows == 0 and 1 or 2),
 
         scale = defaultScale,
-        windowX = (consoleWindows[#consoleWindows] ~= nil and consoleWindows[#consoleWindows].windowX + 40 or 50),
-        windowY = (consoleWindows[#consoleWindows] ~= nil and consoleWindows[#consoleWindows].windowY + 40 or 200),
+        windowX = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowX + 40 or 50),
+        windowY = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowY + 40 or 200),
         windowWidth = 300*defaultScale,
         windowHeight = 300*defaultScale,
         windowWidthMin = 202,
@@ -433,6 +423,7 @@ local function console_create()
         prevWindowWidth = 200,
         windowHoldPoint = 0,
     })
+    windowLastHeld = #consoleWindows
 end
 
 console_create()
@@ -472,10 +463,51 @@ local function console_add_lines(console, string)
     end
 end
 
+local consolePageList = {
+    welcome = 1,
+    player = 2,
+    area = 3,
+}
+local consolePageData = {
+    [consolePageList.welcome] = {
+        name = "Welcome",
+        textFunc = function (m, console)
+            console_add_lines(console, { 
+                "Welcome to Debugging Console!",
+                "This mod has Debugging Windows, Which can be moved around while paused like any other window can!",
+            })
+        end
+    },
+    [consolePageList.player] = {
+        name = "Player",
+        textFunc = function (m, console)
+            console_add_lines(console, {
+                "Player Index: ".. (m.playerIndex) .. " | " .. network_global_index_from_local(m.playerIndex),
+                "Pos: "..math.floor(m.pos.x)..", "..math.floor(m.pos.y)..", "..math.floor(m.pos.z),
+                "Floor Height: ".. (m.floorHeight)
+                "Vel: "..math.floor(m.vel.x)..", "..math.floor(m.vel.y)..", "..math.floor(m.vel.z),
+                "Forward Vel: "..math.floor(m.forwardVel),
+                "Action: "..(infoActionTable[m.action] ~= nil and infoActionTable[m.action] or "???"),
+                "Prev Action: "..(infoActionTable[m.prevAction] ~= nil and infoActionTable[m.prevAction] or "???"),
+            })
+        end
+    },
+    [consolePageList.area] = {
+        name = "Stage/Location",
+        textFunc = function (m, console)
+            local np = gNetworkPlayers[m.playerIndex]
+            console_add_lines(console, {
+                "Level: "..infoLevelTable[np.currLevelNum].." ("..np.currLevelNum..")",
+                "Act: ("..np.currActNum..")",
+                "Area: ("..np.currAreaIndex..")",
+            })
+        end
+    },
+}
+
 local function hud_render()
     djui_hud_set_resolution(RESOLUTION_DJUI)
     local m = gMarioStates[0]
-    local np = gNetworkPlayers[0]
     if consoleToggle then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
@@ -492,42 +524,16 @@ local function hud_render()
                     "",
                     "Font Handler v0.5",
                     "-----------------------",
+                })
+            end
+
+            if consolePageData[console.consolePage] ~= nil then
+                console_add_lines(console, {
+                    " ",
+                    "Page "..console.consolePage..": "..consolePageData[console.consolePage].name,
                     " ",
                 })
-            end
-
-            if console.consolePage == consolePageList.welcome then
-                console_add_lines(console, {
-                    "Welcome to Debugging Console!",
-                    "This mod has Debugging Windows, Which can be moved around while paused like any other window can!",
-                })
-            end
-
-            if console.consolePage == consolePageList.player then
-                console_add_lines(console, {
-                    "Movement Info:",
-                    "Pos: x="..math.floor(m.pos.x)..", y="..math.floor(m.pos.y)..", z="..math.floor(m.pos.z),
-                    "Forward Vel: "..math.floor(m.forwardVel),
-                    "Vertical Vel: "..math.floor(m.vel.y),
-                    "Action: "..(sActionTable[m.action] ~= nil and sActionTable[m.action] or "???"),
-                    "Prev Action: "..(sActionTable[m.prevAction] ~= nil and sActionTable[m.prevAction] or "???"),
-                })
-            end
-
-            if console.consolePage == consolePageList.area then
-                console_add_lines(console, {
-                    "Area Info",
-                    "Level: "..sLevelTable[np.currLevelNum].." ("..np.currLevelNum..")",
-                    "Act: ("..np.currActNum..")",
-                    "Area Index: ("..np.currAreaIndex..")",
-                })
-            end
-            
-            if console.consolePage == consolePageList.brownie then
-                console_add_lines(console, {
-                    "LOADING.....",
-                    "brownie's coming..",
-                })
+                consolePageData[console.consolePage].textFunc(m, console)
             end
 
             if is_game_paused() then
@@ -713,8 +719,8 @@ local function mouse_handler(m)
                 console.consolePage = console.consolePage + 1
                 pageScrollCooldown = 5
             end
-            if console.consolePage < 1 then console.consolePage = consolePageListMax end
-            if console.consolePage > consolePageListMax then console.consolePage = 1 end
+            if console.consolePage < 1 then console.consolePage = #consolePageData end
+            if console.consolePage > #consolePageData then console.consolePage = 1 end
         else
             pageScrollCooldown = pageScrollCooldown - 1
         end
