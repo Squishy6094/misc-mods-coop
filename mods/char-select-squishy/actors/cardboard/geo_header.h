@@ -1,0 +1,13 @@
+extern const GeoLayout cardboard_geo[];
+extern Lights1 cardboard_Wood_f3d_lights;
+extern Lights1 cardboard_Decal_f3d_lights;
+extern u8 cardboard_castle_grounds_textures_0B400_rgba16_rgba16[];
+extern u8 cardboard_Peach_Nise_Momos_Disguise_2D_Artwork_Edit__2__rgba16[];
+extern Vtx cardboard_Cutout_1_mesh_layer_1_vtx_0[815];
+extern Gfx cardboard_Cutout_1_mesh_layer_1_tri_0[];
+extern Vtx cardboard_Cutout_1_mesh_layer_1_vtx_1[310];
+extern Gfx cardboard_Cutout_1_mesh_layer_1_tri_1[];
+extern Gfx mat_cardboard_Wood_f3d[];
+extern Gfx mat_cardboard_Decal_f3d[];
+extern Gfx cardboard_Cutout_1_mesh_layer_1[];
+extern Gfx cardboard_material_revert_render_settings[];
