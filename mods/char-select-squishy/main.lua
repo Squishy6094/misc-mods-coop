@@ -30,6 +30,7 @@ local function mario_update(m)
         if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
             ledge_parkour(m)
             spam_burnout(m)
+            trick_system(m)
         end
     end
 end
@@ -37,10 +38,10 @@ end
 local function before_mario_update(m)
     if menuTable[menuTableRef.moveset].status == 0 or m.playerIndex ~= 0 then return end
     if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY then
+        misc_phys_changes(m)
         teching(m)
         momentum_pound(m)
         custom_slide(m)
-        more_double_jumps(m)
         explode_on_death(m)
     end
 
@@ -48,6 +49,13 @@ local function before_mario_update(m)
         if not gamemode then
             disappear_update(m)
         end
+    end
+end
+
+local function before_phys_step(m)
+    if menuTable[menuTableRef.moveset].status == 0 or m.playerIndex ~= 0 then return end
+    if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY then
+        remove_ground_cap(m)
     end
 end
 
@@ -81,6 +89,7 @@ end
 
 hook_event(HOOK_MARIO_UPDATE, mario_update)
 hook_event(HOOK_BEFORE_MARIO_UPDATE, before_mario_update)
+hook_event(HOOK_BEFORE_PHYS_STEP, before_phys_step)
 hook_event(HOOK_ON_HUD_RENDER_BEHIND, hud_render)
 hook_event(HOOK_ON_PLAYER_CONNECTED, on_player_connected)
 hook_event(HOOK_ON_CHAT_MESSAGE, on_chat_message)

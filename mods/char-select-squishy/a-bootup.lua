@@ -57,3 +57,16 @@ hook_event(HOOK_MARIO_UPDATE, function (m)
 end)
 
 _G.charSelect.character_add_palette_preset(E_MODEL_SQUISHY, squishyPalette)
+
+-- Functions and Constants
+function convert_s16(num)
+    local min = -32768
+    local max = 32767
+    while (num < min) do
+        num = max + (num - min)
+    end
+    while (num > max) do
+        num = min + (num - max)
+    end
+    return num
+end
