@@ -25,12 +25,20 @@ local approach_s32 = approach_s32
 -----------------------
 
 local comboTable = {}
+local comboDisplayTimerMax = 150
 local function combo_add(name, points)
     if #comboTable > 0 then
+        local multiplier = 0
         for i = 1, #comboTable do
             if comboTable[i].name == name then
-                comboTable[i].multiplier = comboTable[i].multiplier + 1
-                comboTable[i].displayTimer = 150
+                multiplier = comboTable[i].multiplier + 1
+                table.remove(comboTable, i)
+                table.insert(comboTable, 1, {
+                    name = name,
+                    points = points,
+                    displayTimer = comboDisplayTimerMax,
+                    multiplier = multiplier,
+                })
                 return
             end
         end
@@ -39,25 +47,40 @@ local function combo_add(name, points)
     table.insert(comboTable, 1, {
         name = name,
         points = points,
-        displayTimer = 150,
+        displayTimer = comboDisplayTimerMax,
         multiplier = 1,
     })
+
+    if #comboTable == 1 and comboTable[1].displayTimer <= 20 then
+        combo_add("Combo Save", 500)
+    end
 end
 
+local pointCache = 0
 function hud_combo_system()
-    if #comboTable == 0 then return end
+    if #comboTable == 0 then pointCache = 0 return end
     djui_hud_set_resolution(RESOLUTION_N64)
     djui_hud_set_font(FONT_MENU)
+    local points = 0
+    local stringOffset = 0
     for i = 1, #comboTable do
         local currCombo = comboTable[i]
         djui_hud_set_color(255, 255, 255, math.min(20, currCombo.displayTimer)*12.25)
-        local string = currCombo.name..(currCombo.multiplier > 1 and " x"..currCombo.multiplier or "").." - "..currCombo.points
-        djui_hud_print_text(string, djui_hud_get_screen_width() - djui_hud_measure_text(string)*0.3 - 10, 230 - (i*15), 0.3)
+        local string = currCombo.name..(currCombo.multiplier > 1 and " x"..currCombo.multiplier or "").." - "..currCombo.points*currCombo.multiplier
+        if i == 1 then stringOffset = djui_hud_measure_text(string)*0.3 end
+        djui_hud_print_text(string, djui_hud_get_screen_width() - djui_hud_measure_text(string)*0.3 - 10, 230 - (i*15) - math.max(0, currCombo.displayTimer - (comboDisplayTimerMax - 2))*2, 0.3)
         currCombo.displayTimer = currCombo.displayTimer - 1
         if currCombo.displayTimer <= 0 then
+            local pointCacheLocal = currCombo.points*currCombo.multiplier
             table.remove(comboTable, i)
+            pointCache = pointCache + pointCacheLocal
         end
+        points = points + currCombo.points * currCombo.multiplier
     end
+    points = points + pointCache
+    stringOffset = stringOffset + djui_hud_measure_text(tostring(points))*0.3
+    djui_hud_set_color(255, 255, 255, 255)
+    djui_hud_print_text(tostring(points), djui_hud_get_screen_width() - stringOffset - 30, 215, 0.3)
 end
 
 local ledgeTimer = 0
@@ -85,29 +108,35 @@ function ledge_parkour(m)
             m.vel.y = math_min(velStore*0.8, 40)
             if ledgeTimer == 1 then -- Firstie gives back raw speed
                 m.forwardVel = velStore
+                combo_add("Ledge Flip Firstie", 300)
             else
                 m.forwardVel = velStore * 0.85
+                combo_add("Ledge Flip", 250)
             end
         end
 
         if m.action == ACT_LEDGE_GRAB and (m.controller.buttonPressed & B_BUTTON) ~= 0 then
-            set_mario_action(m, ACT_SLIDE_KICK, 0)
-            m.vel.y = math_min(velStore*0.2, 20)
+            set_mario_action(m, ACT_SLIDE_KICK_SLIDE, 0)
+            m.vel.y = -30
             if ledgeTimer == 1 then -- Firstie gives back raw speed
                 m.forwardVel = velStore
+                combo_add("Ledge Slide Firstie", 300)
             else
                 m.forwardVel = velStore * 0.9
+                combo_add("Ledge Slide", 250)
             end
         end
     else
         if m.action == ACT_LEDGE_CLIMB_FAST and (m.controller.buttonPressed & A_BUTTON) ~= 0 then
             set_mario_action(m, ACT_FORWARD_ROLLOUT, 0)
+            combo_add("Ledge Rollout", 50)
             m.vel.y = 10
             m.forwardVel = 20
         end
 
         if m.action == ACT_LEDGE_GRAB and (m.controller.buttonPressed & B_BUTTON) ~= 0 then
             set_mario_action(m, ACT_JUMP_KICK, 0)
+            combo_add("Ledge Kick", 50)
             m.vel.y = 20
             m.forwardVel = 10
         end
@@ -153,6 +182,7 @@ function teching(m)
                 else
                     set_mario_action(m, ACT_BACKWARD_ROLLOUT, 1)
                 end
+                combo_add("Tech", 50)
                 play_character_sound(m, CHAR_SOUND_UH2)
                 m.vel.y = 21
                 m.particleFlags = m.particleFlags | ACTIVE_PARTICLE_SPARKLES
@@ -185,6 +215,7 @@ function momentum_pound(m)
         m.peakHeight = m.pos.y
         if m.controller.buttonPressed & A_BUTTON ~= 0 and (cancelCount == 0 or m.prevAction == ACT_WALL_KICK_AIR) and m.pos.y > m.floorHeight + 50 then
             set_mario_action(m, ACT_FORWARD_ROLLOUT, 0)
+            combo_add("Pound Cancel", 25)
             m.particleFlags = PARTICLE_DUST
             local speed = math_sqrt(prevVel.x^2 + prevVel.z^2)*1
             m.faceAngle.y = m.intendedYaw
@@ -225,6 +256,7 @@ function momentum_pound(m)
                 m.vel.y = -30
             else
                 set_mario_action(m, ACT_LAVA_BOOST, 0)
+                combo_add("Lava Pound", 100)
                 m.hurtCounter = 16
                 m.vel.y = 90
             end
@@ -277,6 +309,7 @@ function custom_slide(m)
         local speed = math_max(50, m.forwardVel)
         m.slideVelX = sins(m.faceAngle.y)*speed
         m.slideVelZ = coss(m.faceAngle.y)*speed
+        combo_add("Quick Slide", 50)
     end
 end
 
@@ -376,7 +409,7 @@ function misc_phys_changes(m)
         set_mario_action(m, ACT_JUMP, 0)
         m.vel.y = 40
         m.forwardVel = m.forwardVel + 10
-        combo_add("B-hop", 500)
+        combo_add("B-hop", 10)
     end
 
     -- Air Acceleration
