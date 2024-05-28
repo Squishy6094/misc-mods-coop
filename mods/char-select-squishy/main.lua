@@ -64,6 +64,7 @@ local function hud_render()
     if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
         hud_bubble_timer(m)
         hud_spam_burnout(m)
+        hud_combo_system()
     end
 end
 

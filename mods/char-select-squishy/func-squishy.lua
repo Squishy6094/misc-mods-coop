@@ -24,6 +24,42 @@ local approach_s32 = approach_s32
 -- Squishy Functions --
 -----------------------
 
+local comboTable = {}
+local function combo_add(name, points)
+    if #comboTable > 0 then
+        for i = 1, #comboTable do
+            if comboTable[i].name == name then
+                comboTable[i].multiplier = comboTable[i].multiplier + 1
+                comboTable[i].displayTimer = 150
+                return
+            end
+        end
+    end
+
+    table.insert(comboTable, 1, {
+        name = name,
+        points = points,
+        displayTimer = 150,
+        multiplier = 1,
+    })
+end
+
+function hud_combo_system()
+    if #comboTable == 0 then return end
+    djui_hud_set_resolution(RESOLUTION_N64)
+    djui_hud_set_font(FONT_MENU)
+    for i = 1, #comboTable do
+        local currCombo = comboTable[i]
+        djui_hud_set_color(255, 255, 255, math.min(20, currCombo.displayTimer)*12.25)
+        local string = currCombo.name..(currCombo.multiplier > 1 and " x"..currCombo.multiplier or "").." - "..currCombo.points
+        djui_hud_print_text(string, djui_hud_get_screen_width() - djui_hud_measure_text(string)*0.3 - 10, 230 - (i*15), 0.3)
+        currCombo.displayTimer = currCombo.displayTimer - 1
+        if currCombo.displayTimer <= 0 then
+            table.remove(comboTable, i)
+        end
+    end
+end
+
 local ledgeTimer = 0
 local velStore = 0
 function ledge_parkour(m)
@@ -183,16 +219,13 @@ function momentum_pound(m)
     if m.action == ACT_GROUND_POUND_LAND or (m.action == ACT_BUTT_SLIDE and m.prevAction == ACT_GROUND_POUND_LAND) then
         if m.controller.stickMag > 20 then
             if m.floor.type ~= SURFACE_BURNING then
-                if m.action == ACT_BUTT_SLIDE then
-                    m.slideVelX = prevVel.x
-                    m.slideVelZ = prevVel.z
-                    set_mario_action(m, ACT_SLIDE_KICK_SLIDE, 0)
-                else
-                    set_mario_action(m, ACT_SLIDE_KICK, 0)
-                end
+                m.slideVelX = prevVel.x*2
+                m.slideVelZ = prevVel.z*2
+                set_mario_action(m, ACT_SLIDE_KICK_SLIDE, 0)
+                m.vel.y = -30
             else
                 set_mario_action(m, ACT_LAVA_BOOST, 0)
-                m.hurtCounter = 12
+                m.hurtCounter = 16
                 m.vel.y = 90
             end
             m.faceAngle.y = m.intendedYaw
@@ -343,18 +376,18 @@ function misc_phys_changes(m)
         set_mario_action(m, ACT_JUMP, 0)
         m.vel.y = 40
         m.forwardVel = m.forwardVel + 10
-        groundTimer = groundTimer + 2
+        combo_add("B-hop", 500)
     end
 
     -- Air Acceleration
     if math_floor(m.floorHeight) == math_floor(m.pos.y) and m.action ~= ACT_SLIDE_KICK then
         groundTimer = groundTimer + 1
-        if groundTimer < 15 then
+        if groundTimer < 5 then
             m.faceAngle.y = m.intendedYaw
         end
     else
         groundTimer = 0
-        if m.controller.stickMag > 20 and math_abs(m.forwardVel) > 10 and not techActs[m.action] then
+        if m.controller.stickMag > 20 and math_abs(m.forwardVel) > 10 and not techActs[m.action] and m.forwardVel > 0 then
             airVel = math_max(prevForwardVel + 0.05, m.forwardVel)
             prevForwardVel = math_max(m.forwardVel, prevForwardVel)
             m.forwardVel = airVel
@@ -365,8 +398,8 @@ function misc_phys_changes(m)
     end
 
     if m.action == ACT_SLIDE_KICK_SLIDE then
-        m.slideVelX = m.slideVelX - 1
-        m.slideVelZ = m.slideVelZ - 1
+        m.slideVelX = m.slideVelX - 3
+        m.slideVelZ = m.slideVelZ - 3
     end
 
     if doubleJumpTable[m.action] or (doubleJumpTable[m.prevAction] and prevAction ~= m.action) then
