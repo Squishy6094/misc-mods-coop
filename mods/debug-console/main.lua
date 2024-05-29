@@ -12,6 +12,55 @@ local DEBUG_CONSOLE_VERSION = "v1 (In-Dev)"
 --Tables from a-tables.lua
 local fontInfoConsole, infoActionTable, infoLevelTable, infoVoicesTable = fontInfoConsole, infoActionTable, infoLevelTable, infoVoicesTable
 
+-- Settings Options
+local currOption = 1
+local optionTableRef = {
+    winScale = 1,
+    bootupWin = 2,
+    firstWinHeader = 3,
+}
+
+local optionTable = {
+    [optionTableRef.winScale] = {
+        name = "Window Scale",
+        toggle = tonumber(mod_storage_load("winScale")),
+        toggleSaveName = "winScale",
+        toggleDefault = 1,
+        toggleMax = 3,
+        toggleNames = {"#---", "##--", "###-", "####"},
+    },
+    [optionTableRef.bootupWin] = {
+        name = "Bootup Window",
+        toggle = tonumber(mod_storage_load("bootupWin")),
+        toggleSaveName = "bootupWin",
+        toggleDefault = 1,
+        toggleMax = 1,
+    },
+    [optionTableRef.firstWinHeader] = {
+        name = "First Window Header",
+        toggle = tonumber(mod_storage_load("firstWinHeader")),
+        toggleSaveName = "firstWinHeader",
+        toggleDefault = 1,
+        toggleMax = 1,
+    },
+}
+
+local function failsafe_options()
+    for i = 1, #optionTable do
+        if optionTable[i].toggle == nil or optionTable[i].toggle == "" then
+            optionTable[i].toggle = optionTable[i].toggleDefault
+            if optionTable[i].toggleSaveName ~= nil then
+                mod_storage_save(optionTable[i].toggleSaveName, tostring(optionTable[i].toggle))
+            end
+        end
+        if optionTable[i].toggleNames == nil then
+            optionTable[i].toggleNames = {"X", "O"}
+        end
+    end
+end
+
+failsafe_options()
+
 local stringTable = {}
 
 -- Font can use a unique variable, or an existing font to overwrite it
@@ -20,9 +69,11 @@ FONT_CONSOLE = djui_hud_add_font(get_texture_info("font-console"), fontInfoConso
 local consoleToggle = true
 local consoleWindows = {}
 local defaultScale = 1.5
+local defaultWidth = 300
+local defaultHeight = 300
 local windowHeld = 0
 local windowLastHeld = 1
-local firstWindowOpen = true
+local firstWindowOpen = (optionTable[optionTableRef.firstWinHeader].toggle == 1)
 
 local function console_create()
     table.insert(consoleWindows, {
@@ -31,8 +82,8 @@ local function console_create()
         scale = defaultScale,
         windowX = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowX + 40 or 50),
         windowY = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowY + 40 or 200),
-        windowWidth = 300*defaultScale,
-        windowHeight = 300*defaultScale,
+        windowWidth = defaultWidth,
+        windowHeight = defaultHeight,
         windowWidthMin = 202,
         windowHeightMin = 150,
         
@@ -47,7 +98,9 @@ local function console_create()
     windowLastHeld = #consoleWindows
 end
 
-console_create()
+if optionTable[optionTableRef.bootupWin].toggle == 1 then
+    console_create()
+end
 
 local function console_delete(consoleNum)
     table.remove(consoleWindows, consoleNum)
@@ -89,8 +142,9 @@ end
 
 local consolePageList = {
     welcome = 1,
-    player = 2,
-    area = 3,
+    settings = 2,
+    player = 3,
+    area = 4,
 }
 
 local lastCharacterSound = 0
@@ -114,6 +168,16 @@ local consolePageData = {
                 "different info based on different",
                 "types of things."
             })
+        end
+    },
+    [consolePageList.settings] = {
+        name = "Settings",
+        textFunc = function (m, console)
+            local displayTable = {}
+            for i = 1, #optionTable do
+                displayTable[i] = (i == currOption and "> " or "  ")..optionTable[i].name.." ("..optionTable[i].toggleNames[optionTable[i].toggle + 1]..")"
+            end
+            console_add_lines(console, displayTable)
         end
     },
     [consolePageList.player] = {
@@ -146,6 +210,17 @@ local consolePageData = {
 local function hud_render()
     djui_hud_set_resolution(RESOLUTION_DJUI)
     local m = gMarioStates[0]
+
+    if defaultScale ~= (optionTable[optionTableRef.winScale].toggle + 1)*0.5 then
+        defaultScale = (optionTable[optionTableRef.winScale].toggle + 1)*0.5
+        if #consoleWindows > 0 then 
+            for i = 1, #consoleWindows do
+                consoleWindows[i].scale = defaultScale
+            end
+        end
+        
+    end
+
     if consoleToggle then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
@@ -183,9 +258,9 @@ local function hud_render()
             end
 
             djui_hud_set_color(0, 0, 0, 255)
-            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth, console.windowHeight)
+            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * console.scale, console.windowHeight * console.scale)
             djui_hud_set_color(255, 255, 255, 255)
-            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth, 30)
+            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * console.scale, 30)
             djui_hud_render_texture(gTextures.star, console.windowX + 6, console.windowY + 5, 1.3, 1.3)
             djui_hud_set_font(FONT_TINY)
             if windowLastHeld == i then
@@ -245,8 +320,15 @@ local function nullify_inputs(m)
 end
 
 local pageScrollCooldown = 0
-local function mouse_handler(m)
+
+local inputStallTimerButton = 0
+local inputStallTimerDirectional = 0
+local inputStallToDirectional = 12
+local inputStallToButton = 10
+local function before_mario_update(m)
     if m.playerIndex ~= 0 then return end
+
+    -- Mouse Handler
     if is_game_paused() then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
@@ -363,6 +445,52 @@ local function mouse_handler(m)
             pageScrollCooldown = pageScrollCooldown - 1
         end
     end
+
+    -- Settings Handler
+    if consoleWindows[windowLastHeld].consolePage == consolePageList.settings then
+        local cameraToObject = gMarioStates[0].marioObj.header.gfx.cameraToObject
+        if inputStallTimerDirectional == 0 then
+            if (m.controller.buttonPressed & D_JPAD) ~= 0 then
+                currOption = currOption + 1
+                inputStallTimerDirectional = inputStallToDirectional
+                play_sound(SOUND_MENU_MESSAGE_NEXT_PAGE, cameraToObject)
+            end
+            if (m.controller.buttonPressed & U_JPAD) ~= 0 then
+                currOption = currOption - 1
+                inputStallTimerDirectional = inputStallToDirectional
+                play_sound(SOUND_MENU_MESSAGE_NEXT_PAGE, cameraToObject)
+            end
+            if m.controller.stickY < -60 then
+                currOption = currOption + 1
+                inputStallTimerDirectional = inputStallToDirectional
+                play_sound(SOUND_MENU_MESSAGE_NEXT_PAGE, cameraToObject)
+            end
+            if m.controller.stickY > 60 then
+                currOption = currOption - 1
+                inputStallTimerDirectional = inputStallToDirectional
+                play_sound(SOUND_MENU_MESSAGE_NEXT_PAGE, cameraToObject)
+            end
+        end
+
+        if inputStallTimerButton == 0 then
+            if (m.controller.buttonPressed & A_BUTTON) ~= 0 then
+                optionTable[currOption].toggle = optionTable[currOption].toggle + 1
+                if optionTable[currOption].toggle > optionTable[currOption].toggleMax then optionTable[currOption].toggle = 0 end
+                if optionTable[currOption].toggleSaveName ~= nil then
+                    mod_storage_save(optionTable[currOption].toggleSaveName, tostring(optionTable[currOption].toggle))
+                end
+                inputStallTimerButton = inputStallToButton
+                play_sound(SOUND_MENU_CHANGE_SELECT, cameraToObject)
+            end
+            if (m.controller.buttonPressed & B_BUTTON) ~= 0 then
+                options = false
+                inputStallTimerButton = inputStallToButton
+            end
+        end
+        if currOption > #optionTable then currOption = 1 end
+        if currOption < 1 then currOption = #optionTable end
+        nullify_inputs(m)
+    end
 end
 
 local function console_command()
@@ -376,5 +504,5 @@ end
 
 hook_event(HOOK_CHARACTER_SOUND, get_current_sound)
 hook_event(HOOK_ON_HUD_RENDER, hud_render)
-hook_event(HOOK_BEFORE_MARIO_UPDATE, mouse_handler)
+hook_event(HOOK_BEFORE_MARIO_UPDATE, before_mario_update)
 hook_chat_command("debug-console", "Opens the Debugging Console", console_command)
