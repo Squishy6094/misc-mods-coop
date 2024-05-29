@@ -24,9 +24,14 @@ local approach_s32 = approach_s32
 -- Squishy Functions --
 -----------------------
 
+-- Combo --
+
 local comboTable = {}
 local comboDisplayTimerMax = 150
+local comboKilled = false
+local comboShakeEffect = 0
 local function combo_add(name, points)
+    if comboKilled then return end
     if #comboTable > 0 then
         local multiplier = 0
         for i = 1, #comboTable do
@@ -56,32 +61,160 @@ local function combo_add(name, points)
     end
 end
 
+local function combo_kill()
+    if not comboKilled then 
+        comboKilled = true
+        comboShakeEffect = 10
+        if #comboTable > 0 then
+            for i = 1, #comboTable do
+                comboTable[i].displayTimer = 20
+            end
+        end
+    end
+end
+
 local pointCache = 0
 function hud_combo_system()
-    if #comboTable == 0 then pointCache = 0 return end
+    if #comboTable == 0 then
+        pointCache = 0
+        comboKilled = false
+        return
+    end
     djui_hud_set_resolution(RESOLUTION_N64)
     djui_hud_set_font(FONT_MENU)
     local points = 0
     local stringOffset = 0
     for i = 1, #comboTable do
         local currCombo = comboTable[i]
-        djui_hud_set_color(255, 255, 255, math.min(20, currCombo.displayTimer)*12.25)
-        local string = currCombo.name..(currCombo.multiplier > 1 and " x"..currCombo.multiplier or "").." - "..currCombo.points*currCombo.multiplier
-        if i == 1 then stringOffset = djui_hud_measure_text(string)*0.3 end
-        djui_hud_print_text(string, djui_hud_get_screen_width() - djui_hud_measure_text(string)*0.3 - 10, 230 - (i*15) - math.max(0, currCombo.displayTimer - (comboDisplayTimerMax - 2))*2, 0.3)
-        currCombo.displayTimer = currCombo.displayTimer - 1
-        if currCombo.displayTimer <= 0 then
-            local pointCacheLocal = currCombo.points*currCombo.multiplier
-            table.remove(comboTable, i)
-            pointCache = pointCache + pointCacheLocal
+        if currCombo ~= nil then
+            djui_hud_set_color(255, (not comboKilled and 255 or 100), (not comboKilled and 255 or 100), math.min(20, currCombo.displayTimer)*12.25)
+            local string = currCombo.name..(currCombo.multiplier > 1 and " x"..currCombo.multiplier or "").." - "..currCombo.points*currCombo.multiplier
+            local comboShakeX = 0
+            local comboShakeY = 0
+            if comboShakeEffect > 0 then
+                comboShakeX = math_random(-comboShakeEffect, comboShakeEffect)*0.5
+                comboShakeY = math_random(-comboShakeEffect, comboShakeEffect)*0.5
+            end
+            currCombo.displayTimer = currCombo.displayTimer - 1
+            if currCombo.displayTimer < 0 then
+                local pointCacheLocal = currCombo.points*currCombo.multiplier
+                table.remove(comboTable, i)
+                pointCache = pointCache + pointCacheLocal
+            else
+                points = points + currCombo.points * currCombo.multiplier
+            end
+            if i == 1 then stringOffset = djui_hud_measure_text(string)*0.3 end
+            djui_hud_print_text(string, djui_hud_get_screen_width() - djui_hud_measure_text(string)*0.3 - 10 + comboShakeX, 230 - (i*15) - math.max(0, currCombo.displayTimer - (comboDisplayTimerMax - 2))*2 + comboShakeY, 0.3)
         end
-        points = points + currCombo.points * currCombo.multiplier
     end
-    points = points + pointCache
+    points = math.max(points, points + pointCache)
+    comboShakeEffect = math_max(comboShakeEffect - 1, 0)
     stringOffset = stringOffset + djui_hud_measure_text(tostring(points))*0.3
     djui_hud_set_color(255, 255, 255, 255)
     djui_hud_print_text(tostring(points), djui_hud_get_screen_width() - stringOffset - 30, 215, 0.3)
 end
+
+local techActs = {
+    [ACT_GROUND_BONK] = true,
+    [ACT_BACKWARD_GROUND_KB] = true,
+    [ACT_HARD_BACKWARD_GROUND_KB] = true,
+    [ACT_HARD_FORWARD_GROUND_KB] = true,
+    [ACT_FORWARD_GROUND_KB] = true,
+    [ACT_DEATH_EXIT_LAND] = true,
+    [ACT_FORWARD_AIR_KB] = true,
+    [ACT_BACKWARD_AIR_KB] = true,
+    [ACT_HARD_FORWARD_AIR_KB] = true,
+    [ACT_HARD_BACKWARD_AIR_KB] = true,
+  
+}
+
+-- Physics --
+local doubleJumpTable = {
+    [ACT_LONG_JUMP_LAND] = true,
+    [ACT_FREEFALL_LAND_STOP] = true,
+}
+
+local prevAction = 0
+local prevForwardVel = 0
+local groundTimer = 0
+local airVel = 0
+function misc_phys_changes(m)
+    if m.action == ACT_TRIPLE_JUMP_LAND and m.controller.buttonPressed & A_BUTTON ~= 0 then
+        set_mario_action(m, ACT_JUMP, 0)
+    end
+
+    if m.action == ACT_JUMP then
+        m.vel.y = math_min(m.vel.y, 60)
+    end
+    if m.action == ACT_DOUBLE_JUMP then
+        m.vel.y = math_min(m.vel.y, 80)
+    end
+
+    if m.action == ACT_DIVE and m.controller.buttonPressed & Z_TRIG ~= 0 then
+        set_mario_action(m, ACT_GROUND_POUND, 0)
+        m.vel.y = -100
+        combo_add("Dive Cancel", 50)
+    end
+
+    --B-Hop Mode
+    if (m.action == ACT_JUMP_LAND or m.action == ACT_FREEFALL_LAND_STOP) and m.controller.buttonDown & Z_TRIG ~= 0 and m.controller.buttonDown & A_BUTTON ~= 0 and m.floor.type ~= SURFACE_BURNING then
+        set_mario_action(m, ACT_JUMP, 0)
+        m.vel.y = 40
+        m.forwardVel = m.forwardVel + 10
+        combo_add("B-hop", 10)
+    end
+
+    -- Air Acceleration
+    if math_floor(m.floorHeight) == math_floor(m.pos.y) and m.action ~= ACT_SLIDE_KICK then
+        groundTimer = groundTimer + 1
+        if groundTimer < 5 then
+            m.faceAngle.y = m.intendedYaw
+        end
+    else
+        groundTimer = 0
+        if m.controller.stickMag > 20 and math_abs(m.forwardVel) > 10 and not techActs[m.action] and m.forwardVel > 0 then
+            airVel = math_max(prevForwardVel + 0.05, m.forwardVel)
+            prevForwardVel = math_max(m.forwardVel, prevForwardVel)
+            m.forwardVel = airVel
+        else
+            airVel = 0
+            prevForwardVel = 0
+        end
+    end
+
+    if m.action == ACT_SLIDE_KICK_SLIDE then
+        m.slideVelX = m.slideVelX
+        m.slideVelZ = m.slideVelZ
+    end
+
+    if doubleJumpTable[m.action] or (doubleJumpTable[m.prevAction] and prevAction ~= m.action) and m.floor.type ~= SURFACE_BURNING then
+        if m.controller.buttonPressed & A_BUTTON ~= 0 and m.controller.buttonDown & Z_TRIG == 0 then
+            set_mario_action(m, ACT_DOUBLE_JUMP, 0)
+        end
+    end
+    prevAction = m.action
+
+end
+
+function remove_ground_cap(m)
+    if math_floor(m.floorHeight) == math_floor(m.pos.y) then
+        mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
+        if m.action ~= ACT_SLIDE_KICK_SLIDE then
+            airVel = airVel - 1
+            prevForwardVel = m.forwardVel
+        else
+            m.faceAngle.y = m.intendedYaw - approach_s32(convert_s16(m.intendedYaw - m.faceAngle.y), 0, 0x500, 0x500)
+            airVel = airVel - 0.1
+        end
+    end
+    
+    -- Hard Speed Cap
+    m.forwardVel = math_min(m.forwardVel, 150)
+    airVel = math_min(airVel, 150)
+    prevForwardVel = math_min(prevForwardVel, 150)
+end
+
+-- Actions --
 
 local ledgeTimer = 0
 local velStore = 0
@@ -147,19 +280,6 @@ function ledge_parkour(m)
     end
 end
 
-local techActs = {
-    [ACT_GROUND_BONK] = true,
-    [ACT_BACKWARD_GROUND_KB] = true,
-    [ACT_HARD_BACKWARD_GROUND_KB] = true,
-    [ACT_HARD_FORWARD_GROUND_KB] = true,
-    [ACT_FORWARD_GROUND_KB] = true,
-    [ACT_DEATH_EXIT_LAND] = true,
-    [ACT_FORWARD_AIR_KB] = true,
-    [ACT_BACKWARD_AIR_KB] = true,
-    [ACT_HARD_FORWARD_AIR_KB] = true,
-    [ACT_HARD_BACKWARD_AIR_KB] = true,
-  
-}
 local tech = true
 local techTimer = 10
 local activeVel = 0
@@ -172,24 +292,27 @@ function teching(m)
     if m.health > 255 then
         if (wall and wall.surface) or m.pos.y == m.floorHeight then
             techTimer = techTimer - 1
-            if techActs[m.action] and (m.controller.buttonPressed & Z_TRIG) ~= 0 and techTimer > 0 then
-                if (wall and wall.surface) and m.pos.y ~= m.floorHeight then
-                    m.faceAngle.y = m.faceAngle.y + 0x8000
-                    m.forwardVel = 20
-                end
-                if activeVel > 0 then
-                    set_mario_action(m, ACT_FORWARD_ROLLOUT, 1)
+            if techActs[m.action] then
+                combo_kill()
+                if (m.controller.buttonPressed & Z_TRIG) ~= 0 and techTimer > 0 then
+                    if (wall and wall.surface) and m.pos.y ~= m.floorHeight then
+                        m.faceAngle.y = m.faceAngle.y + 0x8000
+                        m.forwardVel = 20
+                    end
+                    if activeVel > 0 then
+                        set_mario_action(m, ACT_FORWARD_ROLLOUT, 1)
+                    else
+                        set_mario_action(m, ACT_BACKWARD_ROLLOUT, 1)
+                    end
+                    combo_add("Tech", 50)
+                    play_character_sound(m, CHAR_SOUND_UH2)
+                    m.vel.y = 21
+                    m.particleFlags = m.particleFlags | ACTIVE_PARTICLE_SPARKLES
+                    m.invincTimer = 20
+                    techTimer = 10
                 else
-                    set_mario_action(m, ACT_BACKWARD_ROLLOUT, 1)
+                    techTimer = 10
                 end
-                combo_add("Tech", 50)
-                play_character_sound(m, CHAR_SOUND_UH2)
-                m.vel.y = 21
-                m.particleFlags = m.particleFlags | ACTIVE_PARTICLE_SPARKLES
-                m.invincTimer = 20
-                techTimer = 10
-            else
-                techTimer= 10
             end
         end
     end
@@ -213,6 +336,7 @@ function momentum_pound(m)
     if m.action == ACT_GROUND_POUND then
         m.vel.y = -100
         m.peakHeight = m.pos.y
+        m.faceAngle.y = m.intendedYaw
         if m.controller.buttonPressed & A_BUTTON ~= 0 and (cancelCount == 0 or m.prevAction == ACT_WALL_KICK_AIR) and m.pos.y > m.floorHeight + 50 then
             set_mario_action(m, ACT_FORWARD_ROLLOUT, 0)
             combo_add("Pound Cancel", 25)
@@ -250,18 +374,18 @@ function momentum_pound(m)
     if m.action == ACT_GROUND_POUND_LAND or (m.action == ACT_BUTT_SLIDE and m.prevAction == ACT_GROUND_POUND_LAND) then
         if m.controller.stickMag > 20 then
             if m.floor.type ~= SURFACE_BURNING then
-                m.slideVelX = prevVel.x*2
-                m.slideVelZ = prevVel.z*2
-                set_mario_action(m, ACT_SLIDE_KICK_SLIDE, 0)
+                set_mario_action(m, ACT_SLIDE_KICK, 0)
+                m.forwardVel = math_sqrt(prevVel.x^2 + prevVel.z^2)*1.1
+                m.slideYaw = m.intendedYaw
+                combo_add("Pound Slide", 100)
                 m.vel.y = -30
             else
-                set_mario_action(m, ACT_LAVA_BOOST, 0)
-                combo_add("Lava Pound", 100)
-                m.hurtCounter = 16
-                m.vel.y = 90
+                combo_add("Lava Pound", 250)
+                m.forwardVel = 0
+                m.hurtCounter = 8
+                m.vel.y = math_sqrt(prevVel.x^2 + prevVel.z^2)*1.1
             end
             m.faceAngle.y = m.intendedYaw
-            m.forwardVel = math_sqrt(prevVel.x^2 + prevVel.z^2)*1.1
         else
             set_mario_action(m, ACT_BACKWARD_ROLLOUT, 0)
             m.forwardVel = 0
@@ -272,15 +396,6 @@ function momentum_pound(m)
 
     if m.action == ACT_BACKWARD_ROLLOUT and m.prevAction == ACT_GROUND_POUND_LAND and m.controller.buttonPressed & Z_TRIG ~= 0 then
         set_mario_action(m, ACT_GROUND_POUND, 0)
-    end
-
-    if m.action == ACT_SLIDE_KICK and m.pos.y < m.floorHeight + 5 then
-        if slideTimer > 0 then
-            set_mario_action(m, ACT_FORWARD_ROLLOUT, 0)
-        end
-        slideTimer = slideTimer + 1
-    else
-        slideTimer = 0
     end
 end
 
@@ -383,85 +498,6 @@ function explode_on_death(m)
     end
 end
 
-local doubleJumpTable = {
-    [ACT_LONG_JUMP_LAND] = true,
-    [ACT_FREEFALL_LAND_STOP] = true,
-}
-
-local prevAction = 0
-local prevForwardVel = 0
-local groundTimer = 0
-local airVel = 0
-function misc_phys_changes(m)
-    if m.action == ACT_TRIPLE_JUMP_LAND and m.controller.buttonPressed & A_BUTTON ~= 0 then
-        set_mario_action(m, ACT_JUMP, 0)
-    end
-
-    if m.action == ACT_JUMP then
-        m.vel.y = math_min(m.vel.y, 60)
-    end
-    if m.action == ACT_DOUBLE_JUMP then
-        m.vel.y = math_min(m.vel.y, 80)
-    end
-
-    --B-Hop Mode
-    if (m.action == ACT_JUMP_LAND or m.action == ACT_FREEFALL_LAND_STOP) and m.controller.buttonDown & Z_TRIG ~= 0 and m.controller.buttonDown & A_BUTTON ~= 0 and m.floor.type ~= SURFACE_BURNING then
-        set_mario_action(m, ACT_JUMP, 0)
-        m.vel.y = 40
-        m.forwardVel = m.forwardVel + 10
-        combo_add("B-hop", 10)
-    end
-
-    -- Air Acceleration
-    if math_floor(m.floorHeight) == math_floor(m.pos.y) and m.action ~= ACT_SLIDE_KICK then
-        groundTimer = groundTimer + 1
-        if groundTimer < 5 then
-            m.faceAngle.y = m.intendedYaw
-        end
-    else
-        groundTimer = 0
-        if m.controller.stickMag > 20 and math_abs(m.forwardVel) > 10 and not techActs[m.action] and m.forwardVel > 0 then
-            airVel = math_max(prevForwardVel + 0.05, m.forwardVel)
-            prevForwardVel = math_max(m.forwardVel, prevForwardVel)
-            m.forwardVel = airVel
-        else
-            airVel = 0
-            prevForwardVel = 0
-        end
-    end
-
-    if m.action == ACT_SLIDE_KICK_SLIDE then
-        m.slideVelX = m.slideVelX - 3
-        m.slideVelZ = m.slideVelZ - 3
-    end
-
-    if doubleJumpTable[m.action] or (doubleJumpTable[m.prevAction] and prevAction ~= m.action) then
-        if m.controller.buttonPressed & A_BUTTON ~= 0 and m.controller.buttonDown & Z_TRIG == 0 then
-            set_mario_action(m, ACT_DOUBLE_JUMP, 0)
-        end
-    end
-    prevAction = m.action
-
-end
-
-function remove_ground_cap(m)
-    if math_floor(m.floorHeight) == math_floor(m.pos.y) then
-        mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
-        if m.action ~= ACT_SLIDE_KICK_SLIDE then
-            airVel = airVel - 1
-            prevForwardVel = m.forwardVel
-        else
-            m.faceAngle.y = m.intendedYaw - approach_s32(convert_s16(m.intendedYaw - m.faceAngle.y), 0, 0x500, 0x500)
-            airVel = airVel - 0.1
-        end
-    end
-    
-    -- Hard Speed Cap
-    m.forwardVel = math_min(m.forwardVel, 150)
-    airVel = math_min(airVel, 150)
-    prevForwardVel = math_min(prevForwardVel, 150)
-end
-
 local flipRotateActs = {
     [ACT_SIDE_FLIP] = true
 }
@@ -541,6 +577,7 @@ function spam_burnout(m)
         if spamInputs >= spamInputsRequired then
             m.marioObj.oMarioBurnTimer = 200
             set_mario_action(m, ACT_FORWARD_ROLLOUT, 0)
+            m.faceAngle.y = m.intendedYaw
         else
             m.marioObj.oMarioBurnTimer = 0
         end
