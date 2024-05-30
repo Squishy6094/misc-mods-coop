@@ -129,7 +129,7 @@ local function console_add_lines(console, string)
         for i = 1, #string do
             local letter = string:sub(i,i)
             output = output..letter
-            if i%math.floor((console.windowWidth - 10 - fontWidth)/console.scale*MATH_DIVIDE_FONT_WIDTH) == 0 then
+            if i%math.floor((console.windowWidth * console.scale - 10 - fontWidth)/console.scale*MATH_DIVIDE_FONT_WIDTH) == 0 then
                 table.insert(stringTable, output)
                 output = ""
             end
@@ -177,6 +177,10 @@ local consolePageData = {
             for i = 1, #optionTable do
                 displayTable[i] = (i == currOption and "> " or "  ")..optionTable[i].name.." ("..optionTable[i].toggleNames[optionTable[i].toggle + 1]..")"
             end
+            displayTable[#displayTable + 1] = " "
+            displayTable[#displayTable + 1] = "Inputs Disabled"
+            displayTable[#displayTable + 1] = "Up/Down to Navigate"
+            displayTable[#displayTable + 1] = "A button to Toggle"
             console_add_lines(console, displayTable)
         end
     },
@@ -228,6 +232,7 @@ local function hud_render()
         if #consoleWindows < 1 then return end
         for i = 1, #consoleWindows do
             local console = consoleWindows[i]
+            local scale = console.scale
             stringTable = {}
             if i == 1 and firstWindowOpen then
             console_add_lines(console, {
@@ -258,9 +263,9 @@ local function hud_render()
             end
 
             djui_hud_set_color(0, 0, 0, 255)
-            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * console.scale, console.windowHeight * console.scale)
+            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * scale, console.windowHeight * scale)
             djui_hud_set_color(255, 255, 255, 255)
-            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * console.scale, 30)
+            djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * scale, 30)
             djui_hud_render_texture(gTextures.star, console.windowX + 6, console.windowY + 5, 1.3, 1.3)
             djui_hud_set_font(FONT_TINY)
             if windowLastHeld == i then
@@ -270,15 +275,15 @@ local function hud_render()
             end
             djui_hud_print_text("Debug Console "..DEBUG_CONSOLE_VERSION, console.windowX + 30, console.windowY + 4, 1.5)
             djui_hud_set_color(255, 0, 0, console.exitAnimTimer)
-            djui_hud_render_rect(console.windowX + console.windowWidth - 50, console.windowY, 50, 30)
+            djui_hud_render_rect(console.windowX + console.windowWidth * scale - 50, console.windowY, 50, 30)
             djui_hud_set_color(console.exitAnimTimer, console.exitAnimTimer, console.exitAnimTimer, 255)
             djui_hud_set_rotation(0x2000, 0.5, 0.5)
-            djui_hud_render_rect(console.windowX + console.windowWidth - 31, console.windowY + 14, 15, 1)
-            djui_hud_render_rect(console.windowX + console.windowWidth - 23, console.windowY + 7, 1, 15)
+            djui_hud_render_rect(console.windowX + console.windowWidth * scale - 31, console.windowY + 14, 15, 1)
+            djui_hud_render_rect(console.windowX + console.windowWidth * scale - 23, console.windowY + 7, 1, 15)
             djui_hud_set_rotation(0, 0, 0)
             djui_hud_set_font(FONT_CONSOLE)
             djui_hud_set_color(255, 255, 255, 255)
-            for i = 1, math.min(#stringTable, (console.windowHeight/console.scale - 15 - fontHeight)*MATH_DIVIDE_FONT_HEIGHT) do
+            for i = 1, math.min(#stringTable, (console.windowHeight - 15 - fontHeight)*MATH_DIVIDE_FONT_HEIGHT) do
                 djui_hud_print_text(stringTable[i], console.windowX + 10, console.windowY + 30 + (12*(i - 1))*console.scale, console.scale)
             end
         end
@@ -289,14 +294,15 @@ local function hud_render()
 
             if #consoleWindows < 1 then return end
             for i = 1, #consoleWindows do
-                console = consoleWindows[i]
-                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth and mouseX < console.windowX + console.windowWidth + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight) then
+                local console = consoleWindows[i]
+                local scale = console.scale
+                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth * scale and mouseX < console.windowX + console.windowWidth * scale + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight * scale) then
                     djui_hud_set_rotation(0x4000, 0.5, 0.5)
                     djui_hud_render_texture(gTextures.arrow_up, mouseX - 10, mouseY - 20, 2, 2)
                     djui_hud_render_texture(gTextures.arrow_down, mouseX + 10, mouseY - 20, 2, 2)
                     djui_hud_set_rotation(0x0, 0.5, 0.5)
                 end
-                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight and mouseY < console.windowY + console.windowHeight + 20) and (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth) then
+                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight * scale and mouseY < console.windowY + console.windowHeight * scale + 20) and (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale) then
                     djui_hud_render_texture(gTextures.arrow_up, mouseX, mouseY - 15, 2, 2)
                     djui_hud_render_texture(gTextures.arrow_down, mouseX, mouseY + 5, 2, 2)
                 end
@@ -323,8 +329,8 @@ local pageScrollCooldown = 0
 
 local inputStallTimerButton = 0
 local inputStallTimerDirectional = 0
-local inputStallToDirectional = 12
-local inputStallToButton = 10
+local inputStallToDirectional = 10
+local inputStallToButton = 7
 local function before_mario_update(m)
     if m.playerIndex ~= 0 then return end
 
@@ -346,8 +352,9 @@ local function before_mario_update(m)
             if windowHeld == 0 or windowHeld == i then
                 if windowHeld ~= 0 then windowLastHeld = windowHeld end
                 local console = consoleWindows[i]
+                local scale = console.scale
                 -- Window Movement
-                if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth - 50 and mouseY > console.windowY and mouseY < console.windowY + 30) or console.windowHoldPoint == 1 then
+                if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale - 50 and mouseY > console.windowY and mouseY < console.windowY + 30) or console.windowHoldPoint == 1 then
                     if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                         console.windowX = mouseX - console.mouseWindowOffsetX
                         console.windowY = mouseY - console.mouseWindowOffsetY
@@ -363,7 +370,7 @@ local function before_mario_update(m)
                 end
 
                 -- Window Closing
-                if (mouseX > console.windowX + console.windowWidth - 50 and mouseX < console.windowX + console.windowWidth and mouseY > console.windowY and mouseY < console.windowY + 30) then
+                if (mouseX > console.windowX + console.windowWidth * scale - 50 and mouseX < console.windowX + console.windowWidth * scale and mouseY > console.windowY and mouseY < console.windowY + 30) then
                     if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
                         console_delete(i)
                         windowHeld = i
@@ -377,10 +384,10 @@ local function before_mario_update(m)
                 end
 
                 -- Window Horizontal Scaling
-                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth and mouseX < console.windowX + console.windowWidth + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight) or console.windowHoldPoint == 2 then
+                if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth * scale and mouseX < console.windowX + console.windowWidth * scale + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight * scale) or console.windowHoldPoint == 2 then
                     if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
-                        if mouseX > console.windowX + console.windowWidth*0.5 then
-                            console.windowWidth = math.max(mouseX - console.windowX, console.windowWidthMin*console.scale)
+                        if mouseX > console.windowX + console.windowWidth * scale*0.5 then
+                            console.windowWidth = math.max((mouseX - console.windowX)/scale, console.windowWidthMin)
                         else
                             --[[
                             console.windowX = (windowWidth >= 200*scale and mouseX or console.windowX)
@@ -402,10 +409,10 @@ local function before_mario_update(m)
                 end
 
                 -- Window Vertical Scaling
-                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight and mouseY < console.windowY + console.windowHeight + 20) and (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth) or console.windowHoldPoint == 3 then
+                if (mouseY > console.windowY - 20 and mouseY < console.windowY or mouseY > console.windowY + console.windowHeight * scale and mouseY < console.windowY + console.windowHeight * scale + 20) and (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale) or console.windowHoldPoint == 3 then
                     if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
-                        if mouseY > console.windowY + console.windowHeight*0.5 then
-                            console.windowHeight = math.max(mouseY - console.windowY, console.windowHeightMin*console.scale)
+                        if mouseY > console.windowY + console.windowHeight * scale*0.5 then
+                            console.windowHeight = math.max((mouseY - console.windowY)/scale, console.windowHeightMin)
                         else
                             --[[
                             console.windowX = (windowWidth >= 200*scale and mouseX or console.windowX)
@@ -447,7 +454,9 @@ local function before_mario_update(m)
     end
 
     -- Settings Handler
-    if consoleWindows[windowLastHeld].consolePage == consolePageList.settings then
+    if #consoleWindows > 0 and consoleWindows[windowLastHeld].consolePage == consolePageList.settings then
+        if inputStallTimerButton > 0 then inputStallTimerButton = inputStallTimerButton - 1 end
+        if inputStallTimerDirectional > 0 then inputStallTimerDirectional = inputStallTimerDirectional - 1 end
         local cameraToObject = gMarioStates[0].marioObj.header.gfx.cameraToObject
         if inputStallTimerDirectional == 0 then
             if (m.controller.buttonPressed & D_JPAD) ~= 0 then
