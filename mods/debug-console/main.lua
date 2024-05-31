@@ -16,8 +16,9 @@ local fontInfoConsole, infoActionTable, infoLevelTable, infoVoicesTable = fontIn
 local currOption = 1
 local optionTableRef = {
     winScale = 1,
-    bootupWin = 2,
-    firstWinHeader = 3,
+    unpauseControls = 2,
+    bootupWin = 3,
+    firstWinHeader = 4,
 }
 
 local optionTable = {
@@ -28,6 +29,13 @@ local optionTable = {
         toggleDefault = 1,
         toggleMax = 3,
         toggleNames = {"#---", "##--", "###-", "####"},
+    },
+    [optionTableRef.unpauseControls] = {
+        name = "D-pad Controls Unpaused",
+        toggle = tonumber(mod_storage_load("unpauseControls")),
+        toggleSaveName = "unpauseControls",
+        toggleDefault = 1,
+        toggleMax = 1,
     },
     [optionTableRef.bootupWin] = {
         name = "Bootup Window",
@@ -181,6 +189,7 @@ local consolePageData = {
             displayTable[#displayTable + 1] = "Inputs Disabled"
             displayTable[#displayTable + 1] = "Up/Down to Navigate"
             displayTable[#displayTable + 1] = "A button to Toggle"
+            displayTable[#displayTable + 1] = "B button to Go to Next Page"
             console_add_lines(console, displayTable)
         end
     },
@@ -257,8 +266,13 @@ local function hud_render()
             if is_game_paused() then
                 console_add_lines(console, {
                     " ",
-                    "< Next | Prev >",
+                    "< Next Page | Prev Page >",
                     "Use mouse to adjust Window"
+                })
+            elseif optionTable[optionTableRef.unpauseControls].toggle == 1 then
+                console_add_lines(console, {
+                    " ",
+                    "< Next Page | Prev Page >",
                 })
             end
 
@@ -293,7 +307,7 @@ local function hud_render()
             djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
 
             if #consoleWindows < 1 then return end
-            for i = 1, #consoleWindows do
+            for i = #consoleWindows, 1, -1 do
                 local console = consoleWindows[i]
                 local scale = console.scale
                 if (mouseX > console.windowX - 20 and mouseX < console.windowX or mouseX > console.windowX + console.windowWidth * scale and mouseX < console.windowX + console.windowWidth * scale + 20) and (mouseY > console.windowY and mouseY < console.windowY + console.windowHeight * scale) then
@@ -348,11 +362,19 @@ local function before_mario_update(m)
             end
         end
         if #consoleWindows < 1 then windowLastHeld = 0 return end
-        for i = #consoleWindows, 1, -1 do
+        for i = 1, #consoleWindows do
             if windowHeld == 0 or windowHeld == i then
                 if windowHeld ~= 0 then windowLastHeld = windowHeld end
                 local console = consoleWindows[i]
                 local scale = console.scale
+
+                -- Window Focus
+                if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale - 50 and mouseY > console.windowY and mouseY < console.windowY + console.windowHeight * scale) then
+                    if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
+                        windowHeld = i
+                    end
+                end
+
                 -- Window Movement
                 if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale - 50 and mouseY > console.windowY and mouseY < console.windowY + 30) or console.windowHoldPoint == 1 then
                     if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
@@ -368,6 +390,7 @@ local function before_mario_update(m)
                         windowHeld = 0
                     end
                 end
+
 
                 -- Window Closing
                 if (mouseX > console.windowX + console.windowWidth * scale - 50 and mouseX < console.windowX + console.windowWidth * scale and mouseY > console.windowY and mouseY < console.windowY + 30) then
@@ -435,7 +458,7 @@ local function before_mario_update(m)
         end
     end
 
-    if windowLastHeld ~= 0 and consoleWindows[windowLastHeld] ~= nil then
+    if windowLastHeld ~= 0 and consoleWindows[windowLastHeld] ~= nil and (optionTable[optionTableRef.unpauseControls].toggle == 1 or is_game_paused()) then
         if pageScrollCooldown <= 0 then
             local console = consoleWindows[windowLastHeld]
             if m.controller.buttonDown & L_JPAD ~= 0 then
@@ -492,7 +515,7 @@ local function before_mario_update(m)
                 play_sound(SOUND_MENU_CHANGE_SELECT, cameraToObject)
             end
             if (m.controller.buttonPressed & B_BUTTON) ~= 0 then
-                options = false
+                consoleWindows[windowLastHeld].consolePage = optionTableRef.unpauseControls + 1
                 inputStallTimerButton = inputStallToButton
             end
         end
