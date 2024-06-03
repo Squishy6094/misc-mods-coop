@@ -19,6 +19,7 @@ local spawn_sync_object = spawn_sync_object
 local level_trigger_warp = level_trigger_warp
 local mario_set_forward_vel = mario_set_forward_vel
 local approach_s32 = approach_s32
+local convert_s16 = convert_s16
 
 -----------------------
 -- Squishy Functions --
@@ -114,12 +115,16 @@ function hud_combo_system()
     djui_hud_print_text(tostring(points), djui_hud_get_screen_width() - stringOffset - 30, 215, 0.3)
 end
 
-local techActs = {
+local bonkActs = {
     [ACT_GROUND_BONK] = true,
     [ACT_BACKWARD_GROUND_KB] = true,
     [ACT_HARD_BACKWARD_GROUND_KB] = true,
     [ACT_HARD_FORWARD_GROUND_KB] = true,
     [ACT_FORWARD_GROUND_KB] = true,
+    [ACT_DEATH_EXIT] = true,
+    [ACT_UNUSED_DEATH_EXIT] = true,
+    [ACT_FALLING_DEATH_EXIT] = true,
+    [ACT_SPECIAL_DEATH_EXIT] = true,
     [ACT_DEATH_EXIT_LAND] = true,
     [ACT_FORWARD_AIR_KB] = true,
     [ACT_BACKWARD_AIR_KB] = true,
@@ -138,9 +143,18 @@ local prevAction = 0
 local prevForwardVel = 0
 local groundTimer = 0
 local airVel = 0
+local prevPos = {x = 0, y = 0, z = 0}
+local posStillCount = 0
 function misc_phys_changes(m)
     if m.action == ACT_TRIPLE_JUMP_LAND and m.controller.buttonPressed & A_BUTTON ~= 0 then
         set_mario_action(m, ACT_JUMP, 0)
+    end
+
+    if m.action == ACT_START_CROUCHING then
+        set_mario_action(m, ACT_CROUCHING, 0)
+    end
+    if m.action == ACT_STOP_CROUCHING then
+        set_mario_action(m, ACT_IDLE, 0)
     end
 
     if m.action == ACT_JUMP then
@@ -156,62 +170,144 @@ function misc_phys_changes(m)
         combo_add("Dive Cancel", 50)
     end
 
-    --B-Hop Mode
-    if (m.action == ACT_JUMP_LAND or m.action == ACT_FREEFALL_LAND_STOP) and m.controller.buttonDown & Z_TRIG ~= 0 and m.controller.buttonDown & A_BUTTON ~= 0 and m.floor.type ~= SURFACE_BURNING then
-        set_mario_action(m, ACT_JUMP, 0)
-        m.vel.y = 40
-        m.forwardVel = m.forwardVel + 10
-        combo_add("B-hop", 10)
-    end
-
     -- Air Acceleration
-    if math_floor(m.floorHeight) == math_floor(m.pos.y) and m.action ~= ACT_SLIDE_KICK then
-        groundTimer = groundTimer + 1
-        if groundTimer < 5 then
-            m.faceAngle.y = m.intendedYaw
-        end
-    else
-        groundTimer = 0
-        if m.controller.stickMag > 20 and math_abs(m.forwardVel) > 10 and not techActs[m.action] and m.forwardVel > 0 then
-            airVel = math_max(prevForwardVel + 0.05, m.forwardVel)
-            prevForwardVel = math_max(m.forwardVel, prevForwardVel)
-            m.forwardVel = airVel
+    if m.action & ACT_FLAG_SWIMMING_OR_FLYING == 0 then
+        if math_floor(m.floorHeight) == math_floor(m.pos.y) and m.action ~= ACT_SLIDE_KICK then
+            groundTimer = groundTimer + 1
+            if groundTimer < 5 then
+                m.faceAngle.y = m.intendedYaw
+            end
         else
+            groundTimer = 0
+            if m.controller.stickMag > 20 and math_abs(m.forwardVel) > 10 and not bonkActs[m.action] and m.forwardVel > 0 then
+                if m.forwardVel > 0 then
+                    airVel = math_max(prevForwardVel + 0.05, m.forwardVel)
+                end
+                prevForwardVel = math_max(m.forwardVel, prevForwardVel)
+                m.forwardVel = airVel
+            else
+                airVel = 0
+                prevForwardVel = 0
+            end
+        end
+
+        --B-Hop Mode
+        if (m.action == ACT_JUMP_LAND or m.action == ACT_FREEFALL_LAND_STOP) and m.controller.buttonDown & Z_TRIG ~= 0 and m.controller.buttonDown & A_BUTTON ~= 0 and m.floor.type ~= SURFACE_BURNING then
+            set_mario_action(m, ACT_JUMP, 0)
+            local angle = m.faceAngle.y
+            local ray = collision_find_surface_on_ray(m.pos.x + sins(angle), m.pos.y + 150, m.pos.z + coss(angle), 0, -300, 0)
+            local floorHeightOffset = 0
+            if ray then
+                floorHeightOffset = m.floorHeight - ray.hitPos.y
+            end
+            mario_set_forward_vel(m, m.forwardVel + (floorHeightOffset*10 < -5 and -5 or 10))
+            prevForwardVel = m.forwardVel
+            airVel = m.forwardVel
+            m.vel.y = 40 + math_abs(m.forwardVel*0.5)*-floorHeightOffset
+            combo_add("B-hop", 10)
+        end
+
+        if m.action == ACT_SLIDE_KICK_SLIDE then
+            m.slideVelX = m.slideVelX
+            m.slideVelZ = m.slideVelZ
+        end
+
+        if doubleJumpTable[m.action] or (doubleJumpTable[m.prevAction] and prevAction ~= m.action) and m.floor.type ~= SURFACE_BURNING then
+            if m.controller.buttonPressed & A_BUTTON ~= 0 and m.controller.buttonDown & Z_TRIG == 0 then
+                set_mario_action(m, ACT_DOUBLE_JUMP, 0)
+            end
+        end
+        
+        if prevPos.x == m.pos.x and prevPos.y == m.pos.y and prevPos.z == m.pos.z then
+            posStillCount = posStillCount + 1
+        else
+            posStillCount = 0
+        end
+
+        if posStillCount > 5 then
+            m.forwardVel = 0
             airVel = 0
             prevForwardVel = 0
         end
-    end
 
-    if m.action == ACT_SLIDE_KICK_SLIDE then
-        m.slideVelX = m.slideVelX
-        m.slideVelZ = m.slideVelZ
-    end
+        prevPos.x = m.pos.x
+        prevPos.y = m.pos.y
+        prevPos.z = m.pos.z
 
-    if doubleJumpTable[m.action] or (doubleJumpTable[m.prevAction] and prevAction ~= m.action) and m.floor.type ~= SURFACE_BURNING then
-        if m.controller.buttonPressed & A_BUTTON ~= 0 and m.controller.buttonDown & Z_TRIG == 0 then
-            set_mario_action(m, ACT_DOUBLE_JUMP, 0)
-        end
-    end
-    prevAction = m.action
+        prevAction = m.action
+    else
 
+    end
 end
 
+local speedcap = 150
+if gamemode then
+    speedcap = 100
+end
 function remove_ground_cap(m)
-    if math_floor(m.floorHeight) == math_floor(m.pos.y) then
-        mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
-        if m.action ~= ACT_SLIDE_KICK_SLIDE then
-            airVel = airVel - 1
-            prevForwardVel = m.forwardVel
+    if m.action & ACT_FLAG_SWIMMING_OR_FLYING == 0 then
+        if math_floor(m.floorHeight) == math_floor(m.pos.y) then
+            mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
+            if m.action ~= ACT_SLIDE_KICK_SLIDE then
+                airVel = airVel - 1
+                prevForwardVel = m.forwardVel
+            else
+                m.faceAngle.y = m.intendedYaw - approach_s32(convert_s16(m.intendedYaw - m.faceAngle.y), 0, 0x500, 0x500)
+                airVel = airVel - 0.1
+            end
         else
-            m.faceAngle.y = m.intendedYaw - approach_s32(convert_s16(m.intendedYaw - m.faceAngle.y), 0, 0x500, 0x500)
-            airVel = airVel - 0.1
+            if m.forwardVel > 0 then
+                m.faceAngle.y = m.intendedYaw - approach_s32(convert_s16(m.intendedYaw - m.faceAngle.y), 0, 0x200, 0x200)
+            end
+        end
+    else
+        if m.action & ACT_FLAG_SWIMMING then
+            m.faceAngle.y = m.faceAngle.y - m.controller.stickX*0x10
+            if m.controller.buttonDown & A_BUTTON ~= 0 then
+                airVel = airVel - 0.1
+                set_mario_anim_with_accel(m, MARIO_ANIM_SWIM_PART2, airVel)
+            else
+                airVel = airVel - 3
+            end
+            mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
+        else
+            m.faceAngle.y = m.faceAngle.y - m.controller.stickX*0x10
+            m.faceAngle.z = m.faceAngle.z - m.controller.stickY*0x10
+            airVel = airVel - 1
+            mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
         end
     end
     
     -- Hard Speed Cap
-    m.forwardVel = math_min(m.forwardVel, 150)
-    airVel = math_min(airVel, 150)
-    prevForwardVel = math_min(prevForwardVel, 150)
+    m.forwardVel = math_min(m.forwardVel, speedcap)
+    airVel = math_min(airVel, speedcap)
+    prevForwardVel = math_min(prevForwardVel, speedcap)
+end
+
+
+local flipRotateActs = {
+    [ACT_SIDE_FLIP] = true
+}
+local noRotateActs = {
+    [ACT_WALL_KICK_AIR] = true,
+    [ACT_GRAB_POLE_FAST] = true,
+    [ACT_GRAB_POLE_SLOW] = true,
+    [ACT_TOP_OF_POLE] = true,
+    [ACT_TOP_OF_POLE_JUMP] = true,
+    [ACT_TOP_OF_POLE_TRANSITION] = true,
+    [ACT_CLIMBING_POLE] = true,
+    [ACT_HOLDING_POLE] = true,
+}
+function visual_rotation(m)
+    if m.action & ACT_FLAG_SWIMMING_OR_FLYING == 0 then
+        if math_floor(m.floorHeight) < math_floor(m.pos.y) then
+            if not noRotateActs[m.action] then
+                m.marioObj.header.gfx.angle.y = m.intendedYaw + (not flipRotateActs[m.action] and 0 or 0x8000)
+            end
+        end
+    else
+        m.marioObj.header.gfx.angle.z = m.controller.stickX*0x80
+    end
 end
 
 -- Actions --
@@ -292,7 +388,7 @@ function teching(m)
     if m.health > 255 then
         if (wall and wall.surface) or m.pos.y == m.floorHeight then
             techTimer = techTimer - 1
-            if techActs[m.action] then
+            if bonkActs[m.action] then
                 combo_kill()
                 if (m.controller.buttonPressed & Z_TRIG) ~= 0 and techTimer > 0 then
                     if (wall and wall.surface) and m.pos.y ~= m.floorHeight then
@@ -421,7 +517,7 @@ function custom_slide(m)
     if (m.action == ACT_PUNCHING and m.prevAction == ACT_CROUCHING) or ((m.action == ACT_MOVE_PUNCHING or m.action == ACT_SLIDE_KICK) and m.prevAction == ACT_CROUCH_SLIDE) then
         set_mario_action(m, ACT_SLIDE_KICK_SLIDE, 0)
         m.vel.y = -30
-        local speed = math_max(50, m.forwardVel)
+        local speed = math_max(60, m.forwardVel*1.3)
         m.slideVelX = sins(m.faceAngle.y)*speed
         m.slideVelZ = coss(m.faceAngle.y)*speed
         combo_add("Quick Slide", 50)
@@ -495,28 +591,6 @@ function explode_on_death(m)
                 deathTimer = 0
             end
         end
-    end
-end
-
-local flipRotateActs = {
-    [ACT_SIDE_FLIP] = true
-}
-local noRotateActs = {
-    [ACT_WALL_KICK_AIR] = true,
-    [ACT_GRAB_POLE_FAST] = true,
-    [ACT_GRAB_POLE_SLOW] = true,
-    [ACT_TOP_OF_POLE] = true,
-    [ACT_TOP_OF_POLE_JUMP] = true,
-    [ACT_TOP_OF_POLE_TRANSITION] = true,
-    [ACT_CLIMBING_POLE] = true,
-    [ACT_HOLDING_POLE] = true,
-}
-function trick_system(m)
-    if math_floor(m.floorHeight) < math_floor(m.pos.y) then
-        if not noRotateActs[m.action] then
-            m.marioObj.header.gfx.angle.y = m.intendedYaw + (not flipRotateActs[m.action] and 0 or 0x8000)
-        end
-        m.faceAngle.y = m.intendedYaw - approach_s32(convert_s16(m.intendedYaw - m.faceAngle.y), 0, 0x200, 0x200)
     end
 end
 
@@ -610,5 +684,37 @@ function hud_spam_burnout(m)
         djui_hud_print_text_interpolated("Z", interpPrev.spamBurnout.x, interpPrev.spamBurnout.y, 0.3, x, y, 0.3)
         interpPrev.spamBurnout.x = x
         interpPrev.spamBurnout.y = y
+    end
+end
+
+local prevAlt = 0
+local squishyAltCostumes = {
+    {
+        name = "Squishy",
+        credit = "Trashcam / Squishy",
+        desc = "Squishy T. Server",
+        model = E_MODEL_SQUISHY
+    },
+    {
+        name = "Classic Squishy",
+        credit = "Trashcam / Squishy",
+        desc = "Pre-Estrogen",
+        model = E_MODEL_SQUISHY_CLASSIC
+    },
+    {
+        name = "Paper Squishy",
+        credit = "so2007nic / Squishy",
+        desc = "SBRP Moment",
+        model = E_MODEL_SQUISHY_PAPER
+    },
+    E_MODEL_SQUISHY,
+    E_MODEL_SQUISHY_CLASSIC,
+    E_MODEL_SQUISHY_PAPER
+}
+function alt_custom_update()
+    if prevAlt ~= menuTable[menuTableRef.costume].status then
+        local alt = squishyAltCostumes[menuTable[menuTableRef.costume].status + 1]
+        _G.charSelect.character_edit(charTable[E_MODEL_SQUISHY].cs, alt.name, alt.desc, alt.credit, nil, alt.model)
+        prevAlt = menuTable[menuTableRef.costume].status
     end
 end

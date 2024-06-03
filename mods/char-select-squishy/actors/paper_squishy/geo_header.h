@@ -1,0 +1,13 @@
+extern const GeoLayout paper_squishy_geo[];
+extern u8 paper_squishy_paper_squishy_rgba16[];
+extern u8 paper_squishy_paper_squishy_rgba16_copy[];
+extern Vtx paper_squishy_Plane_mesh_layer_5_vtx_0[9];
+extern Gfx paper_squishy_Plane_mesh_layer_5_tri_0[];
+extern Vtx paper_squishy_Plane_mesh_layer_5_vtx_1[9];
+extern Gfx paper_squishy_Plane_mesh_layer_5_tri_1[];
+extern Gfx mat_paper_squishy_f3dlite_material[];
+extern Gfx mat_revert_paper_squishy_f3dlite_material[];
+extern Gfx mat_paper_squishy_f3dlite_material_001[];
+extern Gfx mat_revert_paper_squishy_f3dlite_material_001[];
+extern Gfx paper_squishy_Plane_mesh_layer_5[];
+extern Gfx paper_squishy_material_revert_render_settings[];

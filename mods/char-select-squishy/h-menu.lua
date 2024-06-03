@@ -8,10 +8,11 @@ local RoomTime = "??:??:??"
 
 menuTableRef = {
     moveset = 1,
-    menuAnims = 2,
-    menuBind = 3,
-    menuColor = 4,
-    openCSmenu = 5,
+    costume = 2,
+    menuAnims = 3,
+    menuBind = 4,
+    menuColor = 5,
+    openCSmenu = 6,
 }
 
 menuTable = {
@@ -31,6 +32,23 @@ menuTable = {
             "Toggles if Moveset changes",
             "apply while playing as",
             "Squishy via Character Select."
+        },
+    },
+    [menuTableRef.costume] = {
+        name = "Costume",
+        nameSave = "costume",
+        status = tonumber(mod_storage_load("costume")),
+        statusMax = 2,
+        statusDefault = 0,
+        --Status Toggle Names
+        statusNames = {
+            [0] = "Default",
+            [1] = "Classic",
+            [2] = "Paper",
+        }, 
+        description = {
+            "Toggles how Squishy looks",
+            "during play",
         },
     },
     [menuTableRef.menuAnims] = {

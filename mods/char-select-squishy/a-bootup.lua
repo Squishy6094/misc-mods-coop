@@ -12,11 +12,15 @@ for i in pairs(gActiveMods) do
     end
 end
 
+menuTable = {}
+
 ---------------------------------
 -- Character Select Initialize --
 ---------------------------------
 
 E_MODEL_SQUISHY = smlua_model_util_get_id("squishy_geo")
+E_MODEL_SQUISHY_CLASSIC = smlua_model_util_get_id("squishy_geo")
+E_MODEL_SQUISHY_PAPER = smlua_model_util_get_id("paper_squishy_geo")
 E_MODEL_CARDBOARD = smlua_model_util_get_id("cardboard_geo")
 
 local TEX_SQUISHY = get_texture_info("squishy-icon")
@@ -36,13 +40,20 @@ local squishyPalette = {
 NETWORK_SQUISHY = 1
 NETWORK_CARDBOARD = 2
 
+local crossSupportNum = _G.charSelect.character_get_number_from_string("Squishy") and _G.charSelect.character_get_number_from_string("Squishy") or 0
+
 charTable = {
-    [E_MODEL_SQUISHY] = {cs = _G.charSelect.character_get_number_from_string("Squishy") and _G.charSelect.character_get_number_from_string("Squishy") or 0, network = NETWORK_SQUISHY},
+    [E_MODEL_SQUISHY] = {cs = crossSupportNum, network = NETWORK_SQUISHY},
+    [E_MODEL_SQUISHY_CLASSIC] = {cs = crossSupportNum, network = NETWORK_SQUISHY},
+    [E_MODEL_SQUISHY_PAPER] = {cs = crossSupportNum, network = NETWORK_SQUISHY},
     [E_MODEL_CARDBOARD] = {cs = 0, network = NETWORK_CARDBOARD},
 }
 
 if charTable[E_MODEL_SQUISHY].cs == 0 then
-    charTable[E_MODEL_SQUISHY].cs = _G.charSelect.character_add("Squishy", "Squishy T. Server", "Trashcam / Squishy", "008800", E_MODEL_SQUISHY, nil, TEX_SQUISHY, 1)
+    local squishyPlace = _G.charSelect.character_add("Squishy", "Squishy T. Server", "Trashcam / Squishy", "008800", E_MODEL_SQUISHY, nil, TEX_SQUISHY, 1)
+    charTable[E_MODEL_SQUISHY].cs = squishyPlace
+    charTable[E_MODEL_SQUISHY_CLASSIC].cs = squishyPlace
+    charTable[E_MODEL_SQUISHY_PAPER].cs = squishyPlace
 else
     _G.charSelect.character_edit(charTable[E_MODEL_SQUISHY].cs, "Squishy", "Squishy T. Server", "Trashcam / Squishy", {r = 0, g = 136, b = 0}, E_MODEL_SQUISHY, nil, TEX_SQUISHY, 1)
 end
@@ -57,6 +68,8 @@ hook_event(HOOK_MARIO_UPDATE, function (m)
 end)
 
 _G.charSelect.character_add_palette_preset(E_MODEL_SQUISHY, squishyPalette)
+_G.charSelect.character_add_palette_preset(E_MODEL_SQUISHY_CLASSIC, squishyPalette)
+_G.charSelect.character_add_palette_preset(E_MODEL_SQUISHY_PAPER, squishyPalette)
 
 -- Functions and Constants
 function convert_s16(num)

@@ -30,8 +30,10 @@ local function mario_update(m)
         if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
             ledge_parkour(m)
             spam_burnout(m)
-            trick_system(m)
         end
+    end
+    if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
+        visual_rotation(m)
     end
 end
 
@@ -65,6 +67,7 @@ local function hud_render()
         hud_bubble_timer(m)
         hud_spam_burnout(m)
         hud_combo_system()
+        alt_custom_update()
     end
 end
 
