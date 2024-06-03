@@ -263,11 +263,11 @@ function remove_ground_cap(m)
     else
         if m.action & ACT_FLAG_SWIMMING then
             m.faceAngle.y = m.faceAngle.y - m.controller.stickX*0x10
-            if m.controller.buttonDown & A_BUTTON ~= 0 then
+            if m.controller.buttonDown & A_BUTTON ~= 0 and airVel > 30 then
                 airVel = airVel - 0.1
-                set_mario_anim_with_accel(m, MARIO_ANIM_SWIM_PART2, airVel)
+                set_mario_animation(m, MARIO_ANIM_SWIM_PART2)
             else
-                airVel = airVel - 3
+                airVel = math_max(airVel - 3, 0)
             end
             mario_set_forward_vel(m, math_max(airVel, m.forwardVel))
         else
@@ -508,7 +508,7 @@ function custom_slide(m)
     if m.action == ACT_FORWARD_ROLLOUT and m.prevAction == ACT_SLIDE_KICK_SLIDE and wasButtslide then
         set_mario_action(m, ACT_DOUBLE_JUMP, 0)
         m.vel.y = math_max(m.forwardVel, 40)
-        m.forwardVel = m.forwardVel*0.8
+        m.forwardVel = m.forwardVel*0.5
         wasButtslide = false
     elseif m.action ~= ACT_SLIDE_KICK_SLIDE then
         wasButtslide = false
