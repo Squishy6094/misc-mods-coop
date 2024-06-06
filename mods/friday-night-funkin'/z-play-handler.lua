@@ -52,14 +52,19 @@ local function load_song(name, difficulty)
         audio_stream_destroy(songVocal2)
     end
 
-    songInst = audio_stream_load(songName.."-Inst.ogg")
-    songVocal1 = audio_stream_load(songName..((not metadata.soloVocalTrack) and "-Voices-"..metadata.playData.characters.player..".ogg" or "-Voices.ogg"))
-    if not metadata.soloVocalTrack then
+    local soloVocalTrack = metadata.playData.soloVocalTrack
+    if not soloVocalTrack then
+        songInst = audio_stream_load(songName.."-Inst.ogg")
+        songVocal1 = audio_stream_load(songName.."-Voices-"..metadata.playData.characters.player..".ogg")
         songVocal2 = audio_stream_load(songName.."-Voices-"..metadata.playData.characters.opponent..".ogg")
+        repeat
+        until songInst.loaded and songVocal1.loaded and songVocal2.loaded
+    else
+        songInst = audio_stream_load(songName.."-Inst.ogg")
+        songVocal1 = audio_stream_load(songName.."-Voices.ogg")
+        repeat
+        until songInst.loaded and soloVocalTrack and songVocal1.loaded
     end
-    repeat
-        
-    until songInst.loaded and (metadata.soloVocalTrack and (songVocal1.loaded and songVocal2.loaded) or (songVocal1.loaded))
 end
 
 local function kill_song()
@@ -75,6 +80,8 @@ local RATING_SICK = 1
 local RATING_GOOD = 2
 local RATING_BAD = 3
 local RATING_SHIT = 4
+
+local keyDownTimer = {}
 
 local swapSong = false
 local function on_hud_render()
@@ -127,24 +134,26 @@ local function on_hud_render()
     djui_hud_set_color(255, 255, 255, 255)
     djui_hud_set_font(FONT_MENU)
     djui_hud_print_text(prevRating, width *0.5 - djui_hud_measure_text(prevRating)*0.1, 10, 0.2)
-
-    for i = 1, #songInfo do
-        djui_chat_message_create(tostring(i))
-        if songInfo[i].song ~= nil then
-            djui_chat_message_create(tostring("FUCK!!!"))
-        end
-    end
 end
 
 local function before_mario_update(m)
     if currSong == nil or m.playerIndex ~= 0 then return end
-    if songInst ~= nil and songInst.loaded and songVocal1.loaded and songVocal2.loaded then
+    if songInst ~= nil and songVocal1 ~= nil and (currSong.metadata.playData.soloVocalTrack and (songVocal1.loaded) or (songVocal1.loaded and songVocal2.loaded)) then
         if songTimer == 0 then
             audio_stream_play(songInst, true, volume)
             audio_stream_play(songVocal1, true, volume)
-            audio_stream_play(songVocal2, true, volume)
+            if not currSong.metadata.playData.soloVocalTrack then
+                audio_stream_play(songVocal2, true, volume)
+            end
         end
         songTimer = songTimer + 1
+    end
+    for i = 0, #keys do
+        if m.controller.buttonDown & keys[i] ~= 0 then
+            keyDownTimer[i] = keyDownTimer[i] + 1
+        else
+            keyDownTimer[i] = -1
+        end
     end
     for i = 1, #currSong.notes[currDiff] do
         -- d = lane, l = holds, t = time, h = hit
@@ -153,7 +162,8 @@ local function before_mario_update(m)
         local noteTime = (currNote.t - songTimer/30*1000)/30*currSong.scrollSpeed[currDiff]*2*scrollSpeed
         if noteTime < 240 and noteTime > -60 then
             if noteTime <= scrollSpeed*5 and noteTime >= scrollSpeed*-5 then
-                if m.controller.buttonPressed & keys[currNote.d] ~= 0 and currNote.h == 0 then
+                djui_chat_message_create(tostring(currNote.d))
+                if keyDownTimer[currNote.d] ~= -1 and keyDownTimer[currNote.d] < 5 and currNote.h == 0 then
                     if noteTime <= scrollSpeed*2 and noteTime >= scrollSpeed*-2 then
                         currNote.h = RATING_SICK
                         prevRating = "Sick! - "..math.floor(noteTime/30*1000).."ms"
