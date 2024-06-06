@@ -1,4 +1,4 @@
-songInfo[songs[1]["pico"]] = {
+songInfo["pico"] = {
     metadata = {
         timeFormat = "ms",
         artist = "Kawai Sprite",
@@ -6,6 +6,7 @@ songInfo[songs[1]["pico"]] = {
           album = "volume1",
           stage = "phillyTrain",
           characters = { player = "bf", girlfriend = "gf", opponent = "pico" },
+          soloVocalTrack = false,
           songVariations = {"erect"},
           difficulties = {"easy", "normal", "hard"},
           noteStyle = "funkin"

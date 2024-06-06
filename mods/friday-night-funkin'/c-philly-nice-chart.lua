@@ -1,4 +1,4 @@
-songInfo[songs[1]["philly-nice"]] = {
+songInfo["philly-nice"] = {
   metadata = {
     timeFormat = "ms",
     artist = "Kawai Sprite",

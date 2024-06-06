@@ -8,12 +8,7 @@ difficulty = {
 
 WEEK_1 = 1
 
-songs = {
-    [WEEK_1] = {
-        ["pico"] = 1,
-        ["philly-nice"] = 2
-    }
-}
+songs = {}
 
 --- @param string string
 --- Splits a string into a table by spaces
