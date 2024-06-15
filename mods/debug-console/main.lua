@@ -7,6 +7,23 @@
     to manually mess with textures tiling
 ]]
 
+---@param x number
+---@return integer
+--- Returns the nearsest integral value to `x`
+function math.round(x)
+    return x>=0 and math.floor(x+0.5) or math.ceil(x-0.5)
+end
+
+--- @param string string
+--- Splits a string into a table by spaces
+function string_split(string)
+    local result = {}
+    for match in string:gmatch(string.format("[^%s]+", " ")) do
+        table.insert(result, match)
+    end
+    return result
+end
+
 local DEBUG_CONSOLE_VERSION = "v1 (In-Dev)"
 
 --Tables from a-tables.lua
@@ -16,9 +33,10 @@ local fontInfoConsole, infoActionTable, infoLevelTable, infoVoicesTable = fontIn
 local currOption = 1
 local optionTableRef = {
     winScale = 1,
-    unpauseControls = 2,
-    bootupWin = 3,
-    firstWinHeader = 4,
+    unpauseDpad = 2,
+    unpauseMouse = 3,
+    bootupWin = 4,
+    transWin = 5,
 }
 
 local optionTable = {
@@ -30,11 +48,18 @@ local optionTable = {
         toggleMax = 3,
         toggleNames = {"#---", "##--", "###-", "####"},
     },
-    [optionTableRef.unpauseControls] = {
-        name = "D-pad Controls Unpaused",
-        toggle = tonumber(mod_storage_load("unpauseControls")),
-        toggleSaveName = "unpauseControls",
+    [optionTableRef.unpauseDpad] = {
+        name = "Unpaused D-pad",
+        toggle = tonumber(mod_storage_load("unpauseDpad")),
+        toggleSaveName = "unpauseDpad",
         toggleDefault = 1,
+        toggleMax = 1,
+    },
+    [optionTableRef.unpauseMouse] = {
+        name = "Unpaused Mouse",
+        toggle = tonumber(mod_storage_load("unpauseMouse")),
+        toggleSaveName = "unpauseMouse",
+        toggleDefault = 0,
         toggleMax = 1,
     },
     [optionTableRef.bootupWin] = {
@@ -44,11 +69,11 @@ local optionTable = {
         toggleDefault = 1,
         toggleMax = 1,
     },
-    [optionTableRef.firstWinHeader] = {
-        name = "First Window Header",
-        toggle = tonumber(mod_storage_load("firstWinHeader")),
-        toggleSaveName = "firstWinHeader",
-        toggleDefault = 1,
+    [optionTableRef.transWin] = {
+        name = "Translucent Window",
+        toggle = tonumber(mod_storage_load("transWin")),
+        toggleSaveName = "transWin",
+        toggleDefault = 0,
         toggleMax = 1,
     },
 }
@@ -67,6 +92,41 @@ local function failsafe_options()
     end
 end
 
+local defaultX = 50
+local defaultY = 200
+local defaultWidth = 300
+local defaultHeight = 300
+
+local modStorageVars = {
+    windowX = (mod_storage_load("windowX") ~= "" and tonumber(mod_storage_load("windowX")) or defaultX),
+    windowY = (mod_storage_load("windowY") ~= "" and tonumber(mod_storage_load("windowY")) or defaultY),
+    windowWidth = (mod_storage_load("windowW") ~= "" and tonumber(mod_storage_load("windowW")) or defaultWidth),
+    windowHeight = (mod_storage_load("windowH") ~= "" and tonumber(mod_storage_load("windowH")) or defaultHeight),
+    windowPage = (mod_storage_load("windowP") ~= "" and tonumber(mod_storage_load("windowP")) or 1),
+}
+local function mod_storage_update_window(x, y, width, height, page)
+    if modStorageVars.windowX ~= x then
+        mod_storage_save("windowX", tostring(x))
+        modStorageVars.windowX = x
+    end
+    if modStorageVars.windowY ~= y then
+        mod_storage_save("windowY", tostring(y))
+        modStorageVars.windowY = y
+    end
+    if modStorageVars.windowWidth ~= width then
+        mod_storage_save("windowW", tostring(width))
+        modStorageVars.windowWidth = width
+    end
+    if modStorageVars.windowHeight ~= height then
+        mod_storage_save("windowH", tostring(height))
+        modStorageVars.windowHeight = height
+    end
+    if modStorageVars.windowPage ~= page then
+        mod_storage_save("windowP", tostring(page))
+        modStorageVars.windowPage = page
+    end
+end
+
 failsafe_options()
 
 local stringTable = {}
@@ -77,22 +137,19 @@ FONT_CONSOLE = djui_hud_add_font(get_texture_info("font-console"), fontInfoConso
 local consoleToggle = true
 local consoleWindows = {}
 local defaultScale = 1.5
-local defaultWidth = 300
-local defaultHeight = 300
 local windowHeld = 0
 local windowLastHeld = 1
-local firstWindowOpen = (optionTable[optionTableRef.firstWinHeader].toggle == 1)
 
 local function console_create()
     table.insert(consoleWindows, {
-        consolePage = (#consoleWindows == 0 and 1 or 2),
+        consolePage = modStorageVars.windowPage --[[(#consoleWindows == 0 and 1 or 3)]],
 
         scale = defaultScale,
-        windowX = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowX + 40 or 50),
-        windowY = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowY + 40 or 200),
-        windowWidth = defaultWidth,
-        windowHeight = defaultHeight,
-        windowWidthMin = 202,
+        windowX = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowX + 40 or modStorageVars.windowX),
+        windowY = (consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].windowY + 40 or modStorageVars.windowY),
+        windowWidth = modStorageVars.windowWidth,
+        windowHeight = modStorageVars.windowHeight,
+        windowWidthMin = 204,
         windowHeightMin = 150,
         
         exitAnimTimer = 0,
@@ -110,17 +167,11 @@ if optionTable[optionTableRef.bootupWin].toggle == 1 then
     console_create()
 end
 
-local function console_delete(consoleNum)
-    table.remove(consoleWindows, consoleNum)
-    if consoleNum == 1 then
-        firstWindowOpen = false
-    end
-end
-
 local fontWidth = fontInfoConsole["_"].width
 local fontHeight = fontInfoConsole["_"].height
 local MATH_DIVIDE_FONT_WIDTH = 1/(fontWidth + 1)
 local MATH_DIVIDE_FONT_HEIGHT = 1/(fontHeight + 1)
+local MATH_DIVIDE_ANGLE = 65536/360
 
 local function console_add_lines(console, string)
     local loopcount = 1
@@ -153,6 +204,7 @@ local consolePageList = {
     settings = 2,
     player = 3,
     area = 4,
+    custom = 5,
 }
 
 local lastCharacterSound = 0
@@ -161,11 +213,20 @@ local function get_current_sound(m, voice)
     lastCharacterSound = voice
 end
 
+local customPageTextDefault = {"Commands:", " /debug-console text [text]", "   Add line", " /debug-console text clear", "   Clears all lines"}
+local customPageText = customPageTextDefault
 local consolePageData = {
     [consolePageList.welcome] = {
-        name = "Welcome",
+        name = "Welcome!",
         textFunc = function (m, console)
             console_add_lines(console, { 
+                "------------------------",
+                "Debug Console "..DEBUG_CONSOLE_VERSION,
+                "Made by Squishy6094",
+                "",
+                "Font Handler v0.5",
+                "------------------------",
+                " ",
                 "Welcome to Debugging Console!",
                 "This mod has Debugging Windows",
                 "Which can be moved around while",
@@ -174,7 +235,7 @@ local consolePageData = {
                 "You can use D-pad Left or Right",
                 "To change 'Pages' which tell you",
                 "different info based on different",
-                "types of things."
+                "categories."
             })
         end
     },
@@ -201,7 +262,9 @@ local consolePageData = {
                 "Pos: "..math.floor(m.pos.x)..", "..math.floor(m.pos.y)..", "..math.floor(m.pos.z),
                 "Vel: "..math.floor(m.vel.x)..", "..math.floor(m.vel.y)..", "..math.floor(m.vel.z),
                 "Forward Vel: "..math.floor(m.forwardVel),
+                "Angle: "..(math.round(m.faceAngle.y/MATH_DIVIDE_ANGLE)+180).." ("..m.faceAngle.y..")",
                 "Action: "..(infoActionTable[m.action] ~= nil and infoActionTable[m.action] or "???"),
+                "  Arg: "..m.actionArg.." Timer: "..m.actionTimer,
                 "Prev Action: "..(infoActionTable[m.prevAction] ~= nil and infoActionTable[m.prevAction] or "???"),
                 "Last Sound: "..(infoVoicesTable[lastCharacterSound] ~= nil and infoVoicesTable[lastCharacterSound] or "???"),
             })
@@ -212,13 +275,51 @@ local consolePageData = {
         textFunc = function (m, console)
             local np = gNetworkPlayers[m.playerIndex]
             console_add_lines(console, {
+                "Pos: "..math.floor(m.pos.x)..", "..math.floor(m.pos.y)..", "..math.floor(m.pos.z),
                 "Level: "..infoLevelTable[np.currLevelNum].." ("..np.currLevelNum..")",
                 "Act: ("..np.currActNum..")",
                 "Area: ("..np.currAreaIndex..")",
             })
         end
     },
+    [consolePageList.custom] = {
+        name = "Custom Page",
+        textFunc = function (m, console)
+            console_add_lines(console, customPageText)
+        end
+    },
 }
+
+if _G.charSelectExists then
+    local forceCharTable = {
+        [CT_MARIO] = "CT_MARIO",
+        [CT_LUIGI] = "CT_LUIGI",
+        [CT_TOAD] = "CT_TOAD",
+        [CT_WALUIGI] = "CT_WALUIGI",
+        [CT_WARIO] = "CT_WARIO",
+    }
+
+    consolePageList.charSelect = #consolePageData + 1
+    consolePageData[consolePageList.charSelect] = {
+        name = "Character Select",
+        textFunc = function (m, console)
+            local currTable = _G.charSelect.character_get_current_table()
+            console_add_lines(console, {
+                "Name: "..currTable.name,
+                "Save Name: "..currTable.saveName,
+                "Credit: "..currTable.credit,
+                "Description: ",
+            })
+            console_add_lines(console, currTable.description)
+            console_add_lines(console, {
+                "Color: "..currTable.color.r..", "..currTable.color.g..", "..currTable.color.b..", ",
+                "Forced: "..forceCharTable[currTable.forceChar].." ("..currTable.forceChar..")",
+                "Table Pos: ".._G.charSelect.character_get_current_number(),
+                "Camera Scale: "..currTable.camScale,
+            })
+        end
+    }
+end
 
 local function hud_render()
     djui_hud_set_resolution(RESOLUTION_DJUI)
@@ -243,16 +344,6 @@ local function hud_render()
             local console = consoleWindows[i]
             local scale = console.scale
             stringTable = {}
-            if i == 1 and firstWindowOpen then
-            console_add_lines(console, {
-                    "-----------------------",
-                    "Debug Console "..DEBUG_CONSOLE_VERSION,
-                    "Made by Squishy6094",
-                    "",
-                    "Font Handler v0.5",
-                    "-----------------------",
-                })
-            end
 
             if consolePageData[console.consolePage] ~= nil then
                 console_add_lines(console, {
@@ -269,14 +360,14 @@ local function hud_render()
                     "< Next Page | Prev Page >",
                     "Use mouse to adjust Window"
                 })
-            elseif optionTable[optionTableRef.unpauseControls].toggle == 1 then
+            elseif optionTable[optionTableRef.unpauseDpad].toggle == 1 then
                 console_add_lines(console, {
                     " ",
                     "< Next Page | Prev Page >",
                 })
             end
 
-            djui_hud_set_color(0, 0, 0, 255)
+            djui_hud_set_color(0, 0, 0, (optionTable[optionTableRef.transWin].toggle == 0 and 255 or 150))
             djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * scale, console.windowHeight * scale)
             djui_hud_set_color(255, 255, 255, 255)
             djui_hud_render_rect(console.windowX, console.windowY, console.windowWidth * scale, 30)
@@ -297,13 +388,13 @@ local function hud_render()
             djui_hud_set_rotation(0, 0, 0)
             djui_hud_set_font(FONT_CONSOLE)
             djui_hud_set_color(255, 255, 255, 255)
-            for i = 1, math.min(#stringTable, (console.windowHeight - 15 - fontHeight)*MATH_DIVIDE_FONT_HEIGHT) do
-                djui_hud_print_text(stringTable[i], console.windowX + 10, console.windowY + 30 + (12*(i - 1))*console.scale, console.scale)
+            for l = 1, math.min(#stringTable, (console.windowHeight - 15 - fontHeight)*MATH_DIVIDE_FONT_HEIGHT) do
+                djui_hud_print_text(stringTable[l], console.windowX + 10, console.windowY + 30 + (12*(l - 1))*console.scale, console.scale)
             end
         end
 
         
-        if is_game_paused() then
+        if (optionTable[optionTableRef.unpauseMouse].toggle == 1 or is_game_paused()) then
             djui_hud_render_texture(gTextures.coin, mouseX, mouseY, 2, 2)
 
             if #consoleWindows < 1 then return end
@@ -349,61 +440,63 @@ local function before_mario_update(m)
     if m.playerIndex ~= 0 then return end
 
     -- Mouse Handler
-    if is_game_paused() then
+    if (optionTable[optionTableRef.unpauseMouse].toggle == 1 or is_game_paused()) then
         local mouseX = djui_hud_get_mouse_x()
         local mouseY = djui_hud_get_mouse_y()
         if consoleWindows[windowLastHeld] == nil then
             if #consoleWindows > 0 then
                 repeat
                     windowLastHeld = windowLastHeld - 1
-                until consoleWindows[windowLastHeld] ~= nil
+                until consoleWindows[windowLastHeld] ~= nil or windowLastHeld < 1
             else
                 windowLastHeld = 1
             end
         end
+        windowHeld = 0
         if #consoleWindows < 1 then windowLastHeld = 0 return end
-        for i = 1, #consoleWindows do
-            if windowHeld == 0 or windowHeld == i then
-                if windowHeld ~= 0 then windowLastHeld = windowHeld end
-                local console = consoleWindows[i]
-                local scale = console.scale
+        for i = #consoleWindows, 1, -1 do
+            local console = consoleWindows[i]
+            local scale = console.scale
 
-                -- Window Focus
-                if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale - 50 and mouseY > console.windowY and mouseY < console.windowY + console.windowHeight * scale) then
-                    if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
-                        windowHeld = i
+            -- Window Focus
+            if (mouseX > console.windowX -20 and mouseX < console.windowX + console.windowWidth * scale + 20 and mouseY > console.windowY - 20 and mouseY < console.windowY + console.windowHeight * scale + 20) then
+                if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
+                    if windowHeld == 0 then
+                        if i ~= #consoleWindows then
+                            consoleWindows[#consoleWindows + 1] = consoleWindows[i]
+                            table.remove(consoleWindows, i)
+                        end
+                        windowHeld = #consoleWindows
                     end
                 end
+            end
 
+            -- Window Closing
+            if (mouseX > console.windowX + console.windowWidth * scale - 50 and mouseX < console.windowX + console.windowWidth * scale and mouseY > console.windowY and mouseY < console.windowY + 30) then
+                if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
+                    table.remove(consoleWindows, #consoleWindows)
+                    windowLastHeld = 0
+                    nullify_inputs(m)
+                end
+                console.exitAnimTimer = math.min(console.exitAnimTimer + 40, 255)
+            else
+                console.exitAnimTimer = math.max(console.exitAnimTimer - 40, 0)
+            end
+
+            if windowHeld == 0 or windowHeld == i then
                 -- Window Movement
                 if (mouseX > console.windowX and mouseX < console.windowX + console.windowWidth * scale - 50 and mouseY > console.windowY and mouseY < console.windowY + 30) or console.windowHoldPoint == 1 then
                     if m.controller.buttonDown & A_BUTTON ~= 0 or m.controller.buttonDown & B_BUTTON ~= 0 then
                         console.windowX = mouseX - console.mouseWindowOffsetX
                         console.windowY = mouseY - console.mouseWindowOffsetY
                         console.windowHoldPoint = 1
-                        windowHeld = i
+                        windowHeld = #consoleWindows
                         nullify_inputs(m)
                     else
                         console.mouseWindowOffsetX = mouseX - console.windowX
                         console.mouseWindowOffsetY = mouseY - console.windowY
                         console.windowHoldPoint = 0
-                        windowHeld = 0
                     end
-                end
-
-
-                -- Window Closing
-                if (mouseX > console.windowX + console.windowWidth * scale - 50 and mouseX < console.windowX + console.windowWidth * scale and mouseY > console.windowY and mouseY < console.windowY + 30) then
-                    if m.controller.buttonPressed & A_BUTTON ~= 0 or m.controller.buttonPressed & B_BUTTON ~= 0 then
-                        console_delete(i)
-                        windowHeld = i
-                        nullify_inputs(m)
-                    else
-                        windowHeld = 0
-                    end
-                    console.exitAnimTimer = math.min(console.exitAnimTimer + 40, 255)
-                else
-                    console.exitAnimTimer = math.max(console.exitAnimTimer - 40, 0)
                 end
 
                 -- Window Horizontal Scaling
@@ -418,7 +511,7 @@ local function before_mario_update(m)
                             ]]
                         end
                         console.windowHoldPoint = 2
-                        windowHeld = i
+                        windowHeld = #consoleWindows
                         nullify_inputs(m)
                     else
                         --[[
@@ -427,7 +520,6 @@ local function before_mario_update(m)
                         prevWindowX = console.windowX
                         prevWindowWidth = console.windowWidth]]
                         console.windowHoldPoint = 0
-                        windowHeld = 0
                     end
                 end
 
@@ -443,7 +535,7 @@ local function before_mario_update(m)
                             ]]
                         end
                         console.windowHoldPoint = 3
-                        windowHeld = i
+                        windowHeld = #consoleWindows
                         nullify_inputs(m)
                     else
                         console.mouseWindowOffsetX = mouseX - console.windowX
@@ -451,14 +543,17 @@ local function before_mario_update(m)
                         console.prevWindowX = console.windowX
                         console.prevWindowWidth = console.windowWidth
                         console.windowHoldPoint = 0
-                        windowHeld = 0
                     end
                 end
+                if windowLastHeld == i then
+                    mod_storage_update_window(console.windowX, console.windowY, console.windowWidth, console.windowHeight, console.consolePage)
+                end
             end
+            if windowHeld ~= 0 then windowLastHeld = windowHeld end
         end
     end
 
-    if windowLastHeld ~= 0 and consoleWindows[windowLastHeld] ~= nil and (optionTable[optionTableRef.unpauseControls].toggle == 1 or is_game_paused()) then
+    if windowLastHeld ~= 0 and consoleWindows[windowLastHeld] ~= nil and (optionTable[optionTableRef.unpauseDpad].toggle == 1 or is_game_paused()) then
         if pageScrollCooldown <= 0 then
             local console = consoleWindows[windowLastHeld]
             if m.controller.buttonDown & L_JPAD ~= 0 then
@@ -477,7 +572,7 @@ local function before_mario_update(m)
     end
 
     -- Settings Handler
-    if #consoleWindows > 0 and consoleWindows[windowLastHeld].consolePage == consolePageList.settings then
+    if #consoleWindows > 0 and consoleWindows[windowLastHeld] ~= nil and consoleWindows[windowLastHeld].consolePage == consolePageList.settings then
         if inputStallTimerButton > 0 then inputStallTimerButton = inputStallTimerButton - 1 end
         if inputStallTimerDirectional > 0 then inputStallTimerDirectional = inputStallTimerDirectional - 1 end
         local cameraToObject = gMarioStates[0].marioObj.header.gfx.cameraToObject
@@ -515,7 +610,7 @@ local function before_mario_update(m)
                 play_sound(SOUND_MENU_CHANGE_SELECT, cameraToObject)
             end
             if (m.controller.buttonPressed & B_BUTTON) ~= 0 then
-                consoleWindows[windowLastHeld].consolePage = optionTableRef.unpauseControls + 1
+                consoleWindows[windowLastHeld].consolePage = optionTableRef.unpauseDpad + 1
                 inputStallTimerButton = inputStallToButton
             end
         end
@@ -525,13 +620,45 @@ local function before_mario_update(m)
     end
 end
 
-local function console_command()
-    if #consoleWindows < 3 then
-        console_create()
-    else
-        djui_chat_message_create("Failed to open Console: Too many console instances open")
+local function console_command(msg)
+    msg = string_split(msg)
+    local command = (msg[1] ~= nil and string.lower(msg[1]) or "")
+    if command == "" or command == " " or command == "open" then
+        if #consoleWindows < 3 then
+            console_create()
+        else
+            djui_chat_message_create("Failed to open Console: Too many console windows open")
+        end
+        return true
     end
-    return true
+    if command == "clear" then
+        if #consoleWindows > 0 then
+            for i = 1, #consoleWindows do
+                table.remove(consoleWindows, 1)
+            end
+            return true
+        else
+            djui_chat_message_create("Failed to clear Consoles: No windows found!")
+            return true
+        end
+    end
+    if command == "text" then
+        if string.lower(msg[2]) == "clear" then
+            for i = 1, #customPageText do
+                table.remove(customPageText, 1)
+            end
+            djui_chat_message_create("Cleared Page "..consolePageList.custom)
+        else
+            local output = ""
+            for i = 2, #msg do
+                output = output..msg[i]..(i ~= #msg and " " or "")
+            end
+            djui_chat_message_create(output)
+            table.insert(customPageText, output)
+            djui_chat_message_create("Added Line on Page "..consolePageList.custom)
+        end
+        return true
+    end
 end
 
 hook_event(HOOK_CHARACTER_SOUND, get_current_sound)

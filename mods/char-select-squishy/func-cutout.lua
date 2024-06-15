@@ -4,7 +4,7 @@
 
 local cloakTimer = 0
 local prevHealth = gMarioStates[0].health
-function disappear_update(m)
+local function disappear_update(m)
     if prevHealth > m.health then
         cloakTimer = 300
         _G.charSelect.character_edit(charTable[E_MODEL_CARDBOARD].cs, nil, nil, nil, nil, E_MODEL_NONE)
@@ -21,3 +21,9 @@ function disappear_update(m)
 
     prevHealth = m.health
 end
+
+movesetFunctions[NETWORK_CARDBOARD] = {
+    before_mario_update = function (m)
+        disappear_update(m)
+    end,
+}

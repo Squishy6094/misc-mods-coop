@@ -4,70 +4,41 @@
 -- Update Hooks --
 ------------------
 
+local charTable = charTable
+
+local currChar = 0
+local currModel = E_MODEL_NONE
+
+local character_get_current_number = _G.charSelect.character_get_current_number
+local character_get_current_table = _G.charSelect.character_get_current_table
+local hud_set_value = hud_set_value
+local character_voice_sound = character_voice_sound
+local character_voice_snore = character_voice_snore
+
 local function mario_update(m)
-    if m.playerIndex == 0 then
-        local currChar = _G.charSelect.character_get_current_number()
-        local currModel = _G.charSelect.character_get_current_table().model
-        if currModel ~= E_MODEL_NONE then
-            if charTable[currModel] ~= nil and currChar == charTable[currModel].cs then
-                gPlayerSyncTable[0].squishyPlayer = charTable[currModel].network
-            else
-                gPlayerSyncTable[0].squishyPlayer = 0
-            end
-        end
-
-        -- Coin Deduction 
-        if not gPlayerSyncTable[0].lostCoins then
-            gPlayerSyncTable[0].lostCoins = 0
-        end
-        if gPlayerSyncTable[0].lostCoins ~= 0 then
-            m.numCoins = m.numCoins - gPlayerSyncTable[0].lostCoins
-            gPlayerSyncTable[0].lostCoins = 0
-            gPlayerSyncTable[0].numCoins = m.numCoins
-            hud_set_value(HUD_DISPLAY_COINS, m.numCoins)
-        end
-
-        if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
-            ledge_parkour(m)
-            spam_burnout(m)
+    local p = gPlayerSyncTable[m.playerIndex]
+    character_voice_snore(m)
+    if m.playerIndex ~= 0 then return end
+    currChar = character_get_current_number()
+    currModel = character_get_current_table().model
+    -- Network Character Update
+    if currModel ~= E_MODEL_NONE then
+        if charTable[currModel] ~= nil and currChar == charTable[currModel].cs then
+            p.squishyPlayer = charTable[currModel].network
+        else
+            p.squishyPlayer = 0
         end
     end
-    if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
-        visual_rotation(m)
-    end
-end
 
-local function before_mario_update(m)
-    if menuTable[menuTableRef.moveset].status == 0 or m.playerIndex ~= 0 then return end
-    if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY then
-        misc_phys_changes(m)
-        teching(m)
-        momentum_pound(m)
-        custom_slide(m)
-        explode_on_death(m)
+    -- Coin Deduction 
+    if not p.lostCoins then
+        p.lostCoins = 0
     end
-
-    if gPlayerSyncTable[0].squishyPlayer == NETWORK_CARDBOARD then
-        if not gamemode then
-            disappear_update(m)
-        end
-    end
-end
-
-local function before_phys_step(m)
-    if menuTable[menuTableRef.moveset].status == 0 or m.playerIndex ~= 0 then return end
-    if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY then
-        remove_ground_cap(m)
-    end
-end
-
-local function hud_render()
-    local m = gMarioStates[0]
-    if gPlayerSyncTable[0].squishyPlayer == NETWORK_SQUISHY and menuTable[menuTableRef.moveset].status ~= 0 then
-        hud_bubble_timer(m)
-        hud_spam_burnout(m)
-        hud_combo_system()
-        alt_custom_update()
+    if p.lostCoins ~= 0 then
+        m.numCoins = m.numCoins - p.lostCoins
+        p.lostCoins = 0
+        p.numCoins = m.numCoins
+        hud_set_value(HUD_DISPLAY_COINS, m.numCoins)
     end
 end
 
@@ -92,8 +63,6 @@ function on_chat_message(m, msg)
 end
 
 hook_event(HOOK_MARIO_UPDATE, mario_update)
-hook_event(HOOK_BEFORE_MARIO_UPDATE, before_mario_update)
-hook_event(HOOK_BEFORE_PHYS_STEP, before_phys_step)
-hook_event(HOOK_ON_HUD_RENDER_BEHIND, hud_render)
+hook_event(HOOK_CHARACTER_SOUND, character_voice_sound)
 hook_event(HOOK_ON_PLAYER_CONNECTED, on_player_connected)
 hook_event(HOOK_ON_CHAT_MESSAGE, on_chat_message)
