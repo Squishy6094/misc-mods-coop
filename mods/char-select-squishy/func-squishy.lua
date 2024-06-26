@@ -316,6 +316,15 @@ local prevVel = {}
 local prevAngle = nil
 local slideTimer = 0
 
+local actDieing = {
+    [ACT_DEATH_ON_BACK] = true,
+    [ACT_DEATH_ON_STOMACH] = true,
+    [ACT_WATER_DEATH] = true,
+    [ACT_DROWNING] = true,
+    [ACT_STANDING_DEATH] = true,
+    [ACT_QUICKSAND_DEATH] = true,
+}
+
 local function before_mario_update(m)
     if not networkIsSquishy[m.playerIndex] then return end 
 
@@ -534,9 +543,13 @@ local function before_mario_update(m)
         end
         if isDieing then
             isDieing = false
-            if gamemode then
+            if gamemode and not actDieing[m.action] then
                 _G.charSelect.character_edit(charTable[E_MODEL_SQUISHY].cs, nil, nil, nil, nil, E_MODEL_SQUISHY)
             end
+        end
+        if actDieing[m.action] then
+            level_trigger_warp(m, WARP_OP_DEATH)
+            isDieing = true
         end
         return
     end
@@ -571,7 +584,6 @@ local function before_mario_update(m)
                     set_mario_action(m, ACT_DISAPPEARED, 0)
                     level_trigger_warp(m, WARP_OP_DEATH)
                 else
-                    set_mario_action(m, ACT_DEATH_ON_BACK)
                     _G.charSelect.character_edit(charTable[E_MODEL_SQUISHY].cs, nil, nil, nil, nil, E_MODEL_NONE)
                 end
                 isDieing = true

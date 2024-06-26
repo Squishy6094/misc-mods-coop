@@ -51,7 +51,7 @@ charTable = {
     [E_MODEL_SQUISHY] = {cs = crossSupportNum, network = NETWORK_SQUISHY},
     [E_MODEL_SQUISHY_CLASSIC] = {cs = crossSupportNum, network = NETWORK_SQUISHY},
     [E_MODEL_SQUISHY_PAPER] = {cs = crossSupportNum, network = NETWORK_SQUISHY},
-    [E_MODEL_SHELL] = {cs = crossSupportNum, network = NETWORK_SHELL},
+    [E_MODEL_SHELL] = {cs = 0, network = NETWORK_SHELL},
     [E_MODEL_CARDBOARD] = {cs = 0, network = NETWORK_CARDBOARD},
 }
 
@@ -70,7 +70,7 @@ if charTable[E_MODEL_SQUISHY].cs == 0 then
 else
     _G.charSelect.character_edit(charTable[E_MODEL_SQUISHY].cs, "Squishy", "Squishy T. Server", "Trashcam / Squishy", {r = 0, g = 136, b = 0}, E_MODEL_SQUISHY, nil, TEX_SQUISHY, 1)
 end
-charTable[E_MODEL_SHELL].cs = _G.charSelect.character_add("Shell", "Silly Ladyy", "KF / Squishy", "6B5EFF", E_MODEL_SHELL, nil, TEX_SQUISHY, 1)
+charTable[E_MODEL_SHELL].cs = _G.charSelect.character_add("Shell", "Silly Ladyy", "KF / Squishy", "6B5EFF", E_MODEL_SHELL, 18, TEX_SQUISHY, 1)
 
 _G.charSelect.character_add_voice(E_MODEL_CARDBOARD, VOICETABLE_NONE)
 _G.charSelect.character_add_voice(E_MODEL_NONE, VOICETABLE_NONE)
@@ -84,6 +84,14 @@ function character_voice_sound(m, sound)
 end
 function character_voice_snore(m)
     if _G.charSelect.character_get_voice(m) == VOICETABLE_NONE then return _G.charSelect.voice.snore(m) end
+end
+
+if _G.charSelectPride then
+    _G.charSelect.character_add_pride_flag(charTable[E_MODEL_SQUISHY].cs, "transgender")
+    --_G.charSelect.character_add_sexuality(charTable[E_MODEL_SQUISHY].cs, "asexual")
+
+    _G.charSelect.character_add_pride_flag(charTable[E_MODEL_SHELL].cs, "transgender")
+    _G.charSelect.character_add_pride_flag(charTable[E_MODEL_SHELL].cs, "lesbian")
 end
 
 -- Functions and Constants
